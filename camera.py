@@ -61,4 +61,4 @@ class Camera:
             self.offset_y = min(0, self.offset_y)
 
         # DEBUG: Puedes añadir prints aquí para ver los valores
-        print(f"Camera offset: ({self.offset_x}, {self.offset_y})")
+        # print(f"Camera offset: ({self.offset_x}, {self.offset_y})")

@@ -207,8 +207,7 @@ class Map:
                 # Dibuja el sprite del obstáculo en lugar del color
                 obstacle_rect_screen = camera.apply(obstacle_rect_world)
                 if hasattr(self.game, 'obstacle_image') and self.game.obstacle_image:
-                    screen.blit(self.game.obstacle_image, obstacle_rect_screen)
-                    print("---> Hay imagen para cargar")
+                    screen.blit(self.game.obstacle_image, obstacle_rect_screen)                 
                 else: # Si no hay imagen de obstáculo, dibuja el color
                     pygame.draw.rect(screen, obstacle.color, obstacle_rect_screen)
-                    print("---> No hay imagen para cargar")
+                    

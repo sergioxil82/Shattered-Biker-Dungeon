@@ -1,10 +1,11 @@
 # enemy.py
 import pygame
 import random
+from item import Armor, Consumable, Weapon
 from utils.constants import *
 
 class Enemy:
-    def __init__(self, game, x, y):
+    def __init__(self, game, x, y, enemy_type="basic_grunt"):
         self.game = game # Referencia al objeto Game principal
         self.x = x       # Posición en coordenadas de tile
         self.y = y       # Posición en coordenadas de tile
@@ -19,6 +20,9 @@ class Enemy:
         self.defense = 2 # Reducción de daño
 
         self.is_alive = True # Nuevo atributo para saber si está vivo
+        self.enemy_type = enemy_type
+
+        self.load_stats_and_image_by_type()
 
     def take_damage(self, damage):
         """Calcula el daño recibido y actualiza HP."""
@@ -118,3 +122,56 @@ class Enemy:
             screen.blit(self.game.enemy_image, enemy_rect_screen)
         else: # Si no hay imagen, dibuja un placeholder de color (útil para depuración)
             pygame.draw.rect(screen, RED, enemy_rect_screen) # Define RED en constants.py
+
+    def load_stats_and_image_by_type(self):
+        if self.enemy_type == "basic_grunt":
+            self.max_hp = 30
+            self.current_hp = 30
+            self.attack = 8
+            self.defense = 3
+            # Asume que esta imagen ya está cargada en main.py como self.game.enemy_image
+            self.image = self.game.enemy_image # Imagen base del enemigo
+
+        elif self.enemy_type == "heavy_hitter":
+            self.max_hp = 60
+            self.current_hp = 60
+            self.attack = 15
+            self.defense = 5
+            # Necesitarías cargar una imagen específica para este tipo de enemigo en main.py
+            # o tener una imagen más genérica y escalarla/tintarla
+            self.image = self.game.heavy_hitter_image # <-- Necesitarías cargar esta en main.py
+            if not hasattr(self.game, 'heavy_hitter_image'):
+                self.image = self.game.enemy_image # Fallback si no está cargada
+
+        # Añade más tipos de enemigos aquí
+        # elif self.enemy_type == "fast_scout":
+        #     self.max_hp = 20
+        #     self.current_hp = 20
+        #     self.attack = 5
+        #     self.defense = 2
+        #     self.image = self.game.fast_scout_image
+
+        # Definir qué ítems suelta este tipo de enemigo
+        self.possible_drops = []
+        if self.enemy_type == "basic_grunt":
+            self.possible_drops.append(Consumable(self.game, "Café Turbo", "Te da un subidón de energía.", {"heal": 10}, "assets/items/coffee.png"))
+        elif self.enemy_type == "heavy_hitter":
+            self.possible_drops.append(Weapon(self.game, "Bate con Clavos", "¡Duele mucho!", 10, "assets/items/spiked_bat.png"))
+            self.possible_drops.append(Armor(self.game, "Chaleco de Placas", "Armadura pesada.", 7, "assets/items/plate_vest.png"))
+
+    def die(self):
+        self.is_alive = False
+        self.game.sound_enemy_death.play()
+        self.game.current_state.show_message(f"¡{self.enemy_type.replace('_', ' ').title()} Derrotado!")
+        print(f"{self.enemy_type.replace('_', ' ').title()} derrotado.")
+
+        # --- Lógica para soltar un ítem al morir --- <-- ¡NUEVO!
+        if self.possible_drops and random.random() < 0.5: # 50% de probabilidad de soltar algo
+            dropped_item = random.choice(self.possible_drops)
+            dropped_item.x = self.x # El ítem aparece donde murió el enemigo
+            dropped_item.y = self.y
+            self.game.current_state.items_on_map.append(dropped_item)
+            self.game.current_state.show_message(f"¡El enemigo soltó un {dropped_item.name}!")
+            print(f"Enemigo soltó {dropped_item.name} en ({self.x}, {self.y}).")
+
+

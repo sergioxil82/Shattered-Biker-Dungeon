@@ -67,10 +67,16 @@ class Game:
             if self.obstacle_image.get_width() != TILE_SIZE:
                 self.obstacle_image = pygame.transform.scale(self.obstacle_image, (TILE_SIZE, TILE_SIZE))
 
-            # --- Carga de imágenes de enemigos --- 
-            self.enemy_image = pygame.image.load("assets/sprites/enemy.png").convert_alpha() 
+            # Carga la imagen del enemigo genérico
+            self.enemy_image = pygame.image.load("assets/sprites/enemy_basic.png").convert_alpha() # Asegúrate de tener esta imagen
             if self.enemy_image.get_width() != TILE_SIZE:
                 self.enemy_image = pygame.transform.scale(self.enemy_image, (TILE_SIZE, TILE_SIZE))
+
+            # Carga la imagen para el Heavy Hitter
+            self.heavy_hitter_image = pygame.image.load("assets/sprites/enemy_heavy.png").convert_alpha() # Necesitas esta imagen
+            if self.heavy_hitter_image.get_width() != TILE_SIZE:
+                self.heavy_hitter_image = pygame.transform.scale(self.heavy_hitter_image, (TILE_SIZE, TILE_SIZE))
+
 
             # --- Carga de imágenes de pickups ---
             self.pickup_health_image = pygame.image.load("assets/sprites/health_potion.png").convert_alpha()

@@ -19,6 +19,7 @@ ORANGE = (255, 165, 0)
 BROWN = (139, 69, 19)
 DARK_BROWN = (101, 67, 33)
 DARK_RED = (139, 0, 0)
+PURPLE = (128,0,128)
 
 # --- Configuración del Juego (Ejemplos iniciales, se expandirán) ---
 TILE_SIZE = 32 # Tamaño de cada "tile" en píxeles (importante para gráficos basados en cuadrícula)

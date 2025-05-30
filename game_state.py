@@ -8,6 +8,7 @@ from camera import Camera
 from enemy import Enemy
 import random
 from pickup import Pickup
+from item import Item, Weapon, Armor, Consumable
 
 # --- Clase Base para los Estados del Juego ---
 class GameState:
@@ -89,14 +90,16 @@ class PlayingState(GameState):
                             self.current_map.player_start_pos[0],
                             self.current_map.player_start_pos[1])
         
-        # Inicializa una lista de enemigos     
+        # Inicializa las listas     
         self.enemies = [] 
+        self.pickups = []
+        self.items_on_map = []
+        
         self.place_enemies()
-
-        self.pickups = [] # <-- Nueva lista para pickups
         self.place_enemies() # Ahora un método
         self.place_obstacles() # <-- Llama a un método para colocar obstáculos
         self.place_pickups() # <-- Nuevo método para colocar pickups
+        self.place_items_on_map()
 
 
         # --- Inicialización de la Cámara ---
@@ -108,8 +111,35 @@ class PlayingState(GameState):
         self.message_timer = 0 # Tiempo restante para mostrar el mensaje
         self.message_duration = 2000 # Duración en milisegundos (2 segundos)
 
+        self.show_inventory = False # Controla si el inventario se está mostrando
+        self.selected_item_index = 0 # Para navegar por el inventario
+
     def handle_input(self, event):
         if event.type == pygame.KEYDOWN:
+            # --- Lógica de Inventario (antes de las acciones de movimiento) ---
+            if event.key == pygame.K_i:
+                self.show_inventory = not self.show_inventory # Alternar inventario
+                self.selected_item_index = 0 # Resetear selección al abrir/cerrar
+                return # No hacer nada más si abrimos/cerramos inventario
+
+            if self.show_inventory:
+                if event.key == pygame.K_UP:
+                    self.selected_item_index = max(0, self.selected_item_index - 1)
+                elif event.key == pygame.K_DOWN:
+                    self.selected_item_index = min(len(self.player.inventory) - 1, self.selected_item_index + 1)
+                elif event.key == pygame.K_RETURN: # Tecla Enter para usar/equipar
+                    if len(self.player.inventory) > 0:
+                        # Intenta usar/equipar el ítem, y si consume turno, pasa el turno a enemigos
+                        action_consumed_turn = self.player.use_item_from_inventory(self.selected_item_index)
+                        if action_consumed_turn:
+                            self.process_enemy_turn() # Pasar el turno a los enemigos
+                        # Si el inventario se queda vacío después de usar, resetear selección
+                        if len(self.player.inventory) == 0:
+                            self.selected_item_index = 0
+                        else: # Ajustar el índice si el ítem usado fue el último
+                            self.selected_item_index = min(self.selected_item_index, len(self.player.inventory) - 1)
+                return # Consumir el evento si estamos en el inventario
+
             dx, dy = 0, 0
             if event.key == pygame.K_UP:
                 dy = -1
@@ -177,36 +207,53 @@ class PlayingState(GameState):
                                    self.player.x == pickup.x and self.player.y == pickup.y:
                                     pickup.collect(self.player)
                                     break # Asumimos solo un pickup por casilla
-                
+                            
+                            # --- Comprobar recogida de Items del mapa --- <-- ¡NUEVA LÓGICA AQUÍ!
+                            # Crear una copia invertida para eliminar de forma segura mientras iteramos
+                            items_to_remove = []
+                            for item_on_map in self.items_on_map:
+                                if self.player.x == item_on_map.x and self.player.y == item_on_map.y:
+                                    if self.player.add_item(item_on_map): # Intentar añadir al inventario
+                                        items_to_remove.append(item_on_map)
+                                        # Suena un sonido de recogida
+                                        self.game.sound_pickup.play()
+                                    break # Un ítem por casilla
+
+                            for item_to_remove in items_to_remove:
+                                self.items_on_map.remove(item_to_remove)
+
                 # --- Turno de los Enemigos (si el jugador realizó una acción) ---
                 if player_action_taken:
-                    # Creamos una copia de la lista de enemigos para iterar,
-                    # ya que la lista original podría modificarse si un enemigo es derrotado.
-                    enemies_to_move = list(self.enemies)
-                    for enemy in enemies_to_move:
-                        if enemy.is_alive: # Solo los enemigos vivos se mueven y atacan
-                            # Comprueba si el enemigo está adyacente al jugador para atacar
-                            if abs(enemy.x - self.player.x) + abs(enemy.y - self.player.y) == 1:
-                                # El enemigo está adyacente, ataca al jugador
-                                player_defeated = enemy.attack_target(self.player)
-                                if player_defeated:
-                                    self.show_message("¡Has sido Derrotado! GAME OVER")
-                                    print("¡GAME OVER! Has sido derrotado.")                                   
-                                    self.game.request_state_change("game_over") 
-                                    return # Sale del manejador de input si el jugador pierde
-                            else:
-                                # Si no está adyacente, intenta moverse
-                                # Los enemigos también necesitan saber la posición del jugador para NO pisarla.
-                                enemy.move(self.current_map, (self.player.x, self.player.y), self.enemies)
-
-                    # Actualiza la cámara después de que todos los movimientos/acciones de los enemigos han terminado
-                    self.camera.update()
+                    self.process_enemy_turn()                   
             
             # Para probar el cambio de estado (pausa, etc.)
             if event.key == pygame.K_p:
                 # self.game.change_state(PauseState(self.game))
                 pass
 
+    # --- Nuevo método para procesar el turno de los enemigos ---
+    def process_enemy_turn(self):
+        enemies_to_process = list(self.enemies)
+        for enemy in enemies_to_process:
+            if enemy.is_alive:
+                if abs(enemy.x - self.player.x) + abs(enemy.y - self.player.y) == 1:
+                    player_defeated = enemy.attack_target(self.player)
+                    if player_defeated:
+                        self.show_message("¡Has sido Derrotado! GAME OVER")
+                        self.game.request_state_change("game_over")
+                        return # Salir si el jugador pierde
+                else:
+                    enemy.move(self.current_map, (self.player.x, self.player.y), self.enemies)
+
+        # Actualiza la cámara después de que todos los movimientos/acciones de los enemigos han terminado
+        self.camera.update()
+
+        # Comprobar la condición de victoria (después del turno del enemigo)
+        if self.player.x == self.current_map.exit_pos[0] and self.player.y == self.current_map.exit_pos[1]:
+            self.show_message("¡Has encontrado la salida! ¡VICTORIA!")
+            self.game.request_state_change("victory")
+            return # Salir si el jugador gana
+        
     def update(self, dt):
         # Aquí se actualizará la lógica principal del juego:
         # - Movimiento del jugador
@@ -243,6 +290,16 @@ class PlayingState(GameState):
         for pickup in self.pickups:
             pickup.draw(screen, self.camera)
 
+        # --- Dibuja ítems en el mapa --- 
+        for item_on_map in self.items_on_map:
+            # Los ítems no se "recogen" de forma instantánea al pasar, solo al interactuar.
+            # Para simplificar ahora, si el jugador se mueve sobre ellos, se recogen.
+            # La lógica de recolección está en handle_input
+            item_on_map_rect_world = pygame.Rect(item_on_map.x * TILE_SIZE, item_on_map.y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+            screen.blit(item_on_map.image, self.camera.apply(item_on_map_rect_world))
+
+
+
         # --- HUD del Jugador ---
         # 1. Texto de HP
         font = pygame.font.Font(None, 24) # Puedes cargar una fuente real si tienes una en assets/fonts/
@@ -277,7 +334,10 @@ class PlayingState(GameState):
             # Centrar el mensaje en la pantalla
             message_rect = message_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
             screen.blit(message_surface, message_rect)
-
+        
+        # --- Dibuja Inventario si está abierto --- <-- ¡NUEVO!
+        if self.show_inventory:
+            self.draw_inventory(screen)
         pygame.display.flip()
 
     def show_message(self, text):
@@ -311,7 +371,13 @@ class PlayingState(GameState):
         
         for i in range(min(num_enemies_to_add, len(valid_spawn_tiles))):
             enemy_x, enemy_y = valid_spawn_tiles[i]
-            self.enemies.append(Enemy(self.game, enemy_x, enemy_y))
+            # Decidir aleatoriamente el tipo de enemigo
+            enemy_type = "basic_grunt"
+            if random.random() < 0.3: # 30% de probabilidad de ser un Heavy Hitter
+                enemy_type = "heavy_hitter"
+            # Puedes añadir más condiciones para otros tipos de enemigos aquí
+
+            self.enemies.append(Enemy(self.game, enemy_x, enemy_y, enemy_type))            
         
         print(f"Colocados {len(self.enemies)} enemigos en el mapa.")
 
@@ -395,6 +461,122 @@ class PlayingState(GameState):
 
         print(f"Colocados {len(self.pickups)} pickups.")
 
+    def place_items_on_map(self):
+        """Coloca ítems (armas, armaduras, consumibles) en el mapa."""
+        self.items_on_map = []
+        valid_item_spawn_tiles = []
+
+        for room_rect in self.current_map.room_rects:
+            for x in range(room_rect.left, room_rect.right + 1):
+                for y in range(room_rect.top, room_rect.bottom + 1):
+                    # Evita superposición con jugador, salida, obstáculos, enemigos y pickups existentes
+                    if self.current_map.is_walkable(x, y) and \
+                    (x, y) != self.player.x and (x, y) != self.player.y and \
+                    (x, y) != self.current_map.exit_pos:
+
+                        is_occupied = False
+                        for obstacle in self.current_map.obstacles:
+                            if obstacle.x == x and obstacle.y == y:
+                                is_occupied = True
+                                break
+                        if is_occupied: continue
+
+                        for enemy in self.enemies:
+                            if enemy.x == x and enemy.y == y:
+                                is_occupied = True
+                                break
+                        if is_occupied: continue
+
+                        for pickup in self.pickups:
+                            if pickup.x == x and pickup.y == y and not pickup.is_collected:
+                                is_occupied = True
+                                break
+                        if is_occupied: continue
+
+                        valid_item_spawn_tiles.append((x, y))
+
+        random.shuffle(valid_item_spawn_tiles)
+
+        # Ejemplos de ítems para colocar
+        items_to_spawn = [
+            Weapon(self.game, "Llave Inglesa", "Un arma de mano oxidada.", 5, "assets/items/wrench.png"),
+            Armor(self.game, "Chaleco Cuero", "Protección básica de motero.", 3, "assets/items/leather_vest.png"),
+            Consumable(self.game, "Café Turbo", "Te da un subidón de energía.", {"heal": 10}, "assets/items/coffee.png"),
+            Weapon(self.game, "Bate con Clavos", "¡Duele mucho!", 10, "assets/items/spiked_bat.png")
+        ]
+
+        for i in range(min(len(items_to_spawn), len(valid_item_spawn_tiles))):
+            item = items_to_spawn[i]
+            ix, iy = valid_item_spawn_tiles[i]
+            # Le damos al ítem una posición para que se pueda dibujar
+            item.x = ix
+            item.y = iy
+            self.items_on_map.append(item)
+
+        print(f"Colocados {len(self.items_on_map)} ítems en el mapa.")
+
+    # --- Nuevo método para dibujar el inventario ---
+    def draw_inventory(self, screen):
+        inventory_width = 300
+        inventory_height = 400
+        inventory_x = (SCREEN_WIDTH - inventory_width) // 2
+        inventory_y = (SCREEN_HEIGHT - inventory_height) // 2
+        inventory_rect = pygame.Rect(inventory_x, inventory_y, inventory_width, inventory_height)
+
+        # Fondo del inventario
+        pygame.draw.rect(screen, GRAY, inventory_rect)
+        pygame.draw.rect(screen, WHITE, inventory_rect, 2) # Borde
+
+        # Título
+        title_font = pygame.font.Font(None, 36)
+        title_text = title_font.render("Inventario", True, BLACK)
+        screen.blit(title_text, (inventory_x + 10, inventory_y + 10))
+
+        # Items en el inventario
+        item_font = pygame.font.Font(None, 24)
+        y_offset = inventory_y + 50
+        for i, item in enumerate(self.player.inventory):
+            text_color = YELLOW if i == self.selected_item_index else BLACK
+            item_text = item_font.render(f"{item.name} ({item.item_type})", True, text_color)
+            screen.blit(item_text, (inventory_x + 20, y_offset + i * 30))
+
+            # Mostrar estadísticas del ítem seleccionado (opcional)
+            if i == self.selected_item_index:
+                desc_font = pygame.font.Font(None, 18)
+                desc_text = desc_font.render(item.description, True, BLACK)
+                screen.blit(desc_text, (inventory_x + 20, y_offset + i * 30 + 20)) # Debajo del nombre
+
+                # Si es arma/armadura, mostrar bonus
+                if item.item_type == "weapon":
+                    bonus_text = desc_font.render(f"Daño: +{item.damage_bonus}", True, BLACK)
+                    screen.blit(bonus_text, (inventory_x + inventory_width - 100, y_offset + i * 30))
+                elif item.item_type == "armor":
+                    bonus_text = desc_font.render(f"Defensa: +{item.defense_bonus}", True, BLACK)
+                    screen.blit(bonus_text, (inventory_x + inventory_width - 100, y_offset + i * 30))
+                elif item.item_type == "consumable" and item.effect.get("heal"):
+                    bonus_text = desc_font.render(f"Cura: {item.effect['heal']} HP", True, BLACK)
+                    screen.blit(bonus_text, (inventory_x + inventory_width - 100, y_offset + i * 30))
+
+        # Estadísticas del jugador
+        stat_y_offset = inventory_y + inventory_height - 100
+        screen.blit(item_font.render(f"HP: {self.player.current_hp}/{self.player.max_hp}", True, BLACK), (inventory_x + 20, stat_y_offset))
+        screen.blit(item_font.render(f"Ataque: {self.player.attack} (Base: {self.player.base_attack})", True, BLACK), (inventory_x + 20, stat_y_offset + 30))
+        screen.blit(item_font.render(f"Defensa: {self.player.defense} (Base: {self.player.base_defense})", True, BLACK), (inventory_x + 20, stat_y_offset + 60))
+
+        # Equipo actual
+        equipped_y_offset = inventory_y + 50
+        screen.blit(item_font.render("Arma Equipada:", True, BLACK), (inventory_x + inventory_width - 150, equipped_y_offset))
+        weapon_name = self.player.equipped_weapon.name if self.player.equipped_weapon else "Ninguna"
+        screen.blit(item_font.render(weapon_name, True, BLACK), (inventory_x + inventory_width - 150, equipped_y_offset + 20))
+
+        screen.blit(item_font.render("Armadura Equipada:", True, BLACK), (inventory_x + inventory_width - 150, equipped_y_offset + 60))
+        armor_name = self.player.equipped_armor.name if self.player.equipped_armor else "Ninguna"
+        screen.blit(item_font.render(armor_name, True, BLACK), (inventory_x + inventory_width - 150, equipped_y_offset + 80))
+
+        # Instrucciones
+        instructions_font = pygame.font.Font(None, 20)
+        instructions_text = instructions_font.render("Flechas: Mover, Enter: Usar/Equipar, I: Cerrar", True, BLACK)
+        screen.blit(instructions_text, (inventory_x + 10, inventory_y + inventory_height - 25))
 
 
 class GameOverState(GameState):
@@ -421,13 +603,13 @@ class GameOverState(GameState):
         screen_rect = screen.get_rect()
         image_rect = self.game.game_over_image.get_rect(center=screen_rect.center)
         screen.blit(self.game.game_over_image, image_rect)
-        game_over_text = self.font.render("GAME OVER", True, RED)
+        #game_over_text = self.font.render("GAME OVER", True, RED)
         restart_text = self.small_font.render("Pulsa 'R' para Reiniciar o 'ESC' para Salir", True, WHITE)
 
-        game_over_rect = game_over_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50))
+        #game_over_rect = game_over_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50))
         restart_rect = restart_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50))
 
-        screen.blit(game_over_text, game_over_rect)
+        #screen.blit(game_over_text, game_over_rect)
         screen.blit(restart_text, restart_rect)
         pygame.display.flip()
 
@@ -457,12 +639,12 @@ class VictoryState(GameState):
         image_rect = self.game.victory_image.get_rect(center=screen_rect.center)
         screen.blit(self.game.victory_image, image_rect)
 
-        victory_text = self.font.render("¡VICTORIA!", True, GREEN)
+        #victory_text = self.font.render("¡VICTORIA!", True, GREEN)
         restart_text = self.small_font.render("Pulsa 'R' para Reiniciar o 'ESC' para Salir", True, WHITE)
 
-        victory_rect = victory_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50))
+        # victory_rect = victory_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50))
         restart_rect = restart_text.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 + 50))
 
-        screen.blit(victory_text, victory_rect)
+        # screen.blit(victory_text, victory_rect)
         screen.blit(restart_text, restart_rect)
         pygame.display.flip()

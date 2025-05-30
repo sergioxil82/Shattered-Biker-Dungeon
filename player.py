@@ -12,11 +12,21 @@ class Player:
         self.height = TILE_SIZE
         self.speed = PLAYER_SPEED # Velocidad de movimiento (en tiles por ahora)
 
-         # --- Estadísticas de combate ---
+        # Estadísticas base
+        self.base_attack = 10
+        self.base_defense = 5
         self.max_hp = 100
         self.current_hp = self.max_hp
-        self.attack = 15 # Daño base que inflige
-        self.defense = 5 # Reducción de daño
+
+        # Estadísticas actuales (afectadas por el equipo)
+        self.attack = self.base_attack
+        self.defense = self.base_defense
+
+         # Inventario y equipo
+        self.inventory = [] # Lista para almacenar objetos Item
+        self.inventory_capacity = 8 # Capacidad del inventario
+        self.equipped_weapon = None
+        self.equipped_armor = None
     
     def take_damage(self, damage):
         """Calcula el daño recibido y actualiza HP."""
@@ -94,3 +104,48 @@ class Player:
     def draw(self, screen, camera):
         # Dibuja el jugador, aplicando el desplazamiento de la cámara
         screen.blit(self.game.player_image, camera.apply(self.get_rect()))
+    
+    def add_item(self, item):
+        if len(self.inventory) < self.inventory_capacity:
+            self.inventory.append(item)
+            self.game.current_state.show_message(f"Recogiste: {item.name}")
+            print(f"Item '{item.name}' añadido al inventario. Items: {self.inventory}")
+            return True
+        else:
+            self.game.current_state.show_message("Inventario lleno!")
+            print("Inventario lleno.")
+            return False
+
+    def equip_item(self, item):
+        if item.item_type == "weapon":
+            # Desequipa el arma actual si existe
+            if self.equipped_weapon:
+                self.game.current_state.show_message(f"Desequipaste: {self.equipped_weapon.name}")
+                # Opcional: devolver al inventario o tirarlo al suelo
+            self.equipped_weapon = item
+            self.attack = self.base_attack + item.damage_bonus
+        elif item.item_type == "armor":
+            # Desequipa la armadura actual si existe
+            if self.equipped_armor:
+                self.game.current_state.show_message(f"Desequipaste: {self.equipped_armor.name}")
+            self.equipped_armor = item
+            self.defense = self.base_defense + item.defense_bonus
+
+        self.game.current_state.show_message(f"Equipaste: {item.name}")
+        print(f"Jugador equipó {item.name}.")
+
+    def use_item_from_inventory(self, item_index):
+        """Usa un item del inventario por su índice."""
+        if 0 <= item_index < len(self.inventory):
+            item = self.inventory[item_index]
+            if item.item_type == "consumable":
+                if item.use(self): # El método use de consumible devuelve True si se consume
+                    self.inventory.pop(item_index) # Elimina el consumible del inventario
+                    print(f"Item {item.name} consumido.")
+                    return True # Se usó un turno
+            elif item.item_type in ["weapon", "armor"]:
+                item.equip(self) # El método equip actualiza estadísticas
+                # Puedes decidir si el item equipado permanece en el inventario o se "equipa" y sale
+                # Por simplicidad, lo dejamos en el inventario.
+                return False # Equipar no consume el turno
+        return False # No se usó un turno
