@@ -1,0 +1,120 @@
+# enemy.py
+import pygame
+import random
+from utils.constants import *
+
+class Enemy:
+    def __init__(self, game, x, y):
+        self.game = game # Referencia al objeto Game principal
+        self.x = x       # Posición en coordenadas de tile
+        self.y = y       # Posición en coordenadas de tile
+        self.width = TILE_SIZE
+        self.height = TILE_SIZE
+        self.speed = ENEMY_SPEED 
+
+        # --- Estadísticas de combate ---
+        self.max_hp = 30
+        self.current_hp = self.max_hp
+        self.attack = 10 # Daño base que inflige
+        self.defense = 2 # Reducción de daño
+
+        self.is_alive = True # Nuevo atributo para saber si está vivo
+
+    def take_damage(self, damage):
+        """Calcula el daño recibido y actualiza HP."""
+        if not self.is_alive: # No se puede dañar a un enemigo muerto
+            return False
+
+        actual_damage = max(1, damage - self.defense)
+        self.current_hp -= actual_damage
+        print(f"Enemigo en ({self.x}, {self.y}) recibió {actual_damage} de daño. HP restantes: {self.current_hp}/{self.max_hp}")
+
+        if self.current_hp <= 0:
+            self.current_hp = 0 # Asegurarse de que no baje de 0
+            self.is_alive = False
+            print(f"Enemigo en ({self.x}, {self.y}) ha sido derrotado.")
+            return True # Enemigo derrotado
+        return False # Enemigo no derrotado
+
+    def attack_target(self, target): # Añade un método de ataque
+        """Ataca a un objetivo (jugador)."""
+        if not self.is_alive: # Un enemigo muerto no ataca
+            return
+
+        self.game.sound_attack.play() # Sonido de ataque del enemigo
+        print(f"Enemigo en ({self.x}, {self.y}) atacó al jugador.")
+        target_defeated = target.take_damage(self.attack)
+        return target_defeated # Devuelve si el jugador fue derrotado
+    
+    def get_rect(self):
+        """Devuelve el rectángulo de posición del enemigo en coordenadas del mundo."""
+        return pygame.Rect(self.x * TILE_SIZE, self.y * TILE_SIZE, self.width, self.height)
+
+ 
+    def move(self, current_map, player_pos, all_enemies): 
+        """
+        Implementa un movimiento básico para el enemigo.
+        Ahora, evita colisionar con obstáculos, el jugador y otros enemigos.
+        """
+        possible_moves = [(0, -1), (0, 1), (-1, 0), (1, 0)] # Arriba, Abajo, Izquierda, Derecha
+        random.shuffle(possible_moves) # Mezcla los movimientos para aleatoriedad
+
+        for dx, dy in possible_moves:
+            new_x = self.x + dx
+            new_y = self.y + dy
+
+            # 1. Verificar si la nueva posición es caminable (tiles de pared/abismo)
+            if not current_map.is_walkable(new_x, new_y):
+                continue # Pasa al siguiente movimiento posible
+
+            # 2. Verificar colisión con obstáculos
+            collides_with_obstacle = False
+            for obstacle in current_map.obstacles:
+                if obstacle.x == new_x and obstacle.y == new_y:
+                    collides_with_obstacle = True
+                    break
+            if collides_with_obstacle:
+                continue # Pasa al siguiente movimiento posible
+
+            # 3. Verificar colisión con el jugador
+            if new_x == player_pos[0] and new_y == player_pos[1]:
+                # ¡Colisión con el jugador! Aquí, en el futuro, se iniciaría el combate.
+                # Por ahora, el enemigo simplemente NO se mueve a la casilla del jugador.
+                print(f"Enemigo en ({self.x}, {self.y}) intentó moverse a la posición del jugador ({new_x}, {new_y})")
+                # Lógica de combate básica: El enemigo ataca al jugador
+                # self.attack(player) # <-- Esto se implementaría más adelante
+                continue # Pasa al siguiente movimiento posible si no puede atacar y quedarse
+
+            # 4. Verificar colisión con otros enemigos
+            collides_with_other_enemy = False
+            for other_enemy in all_enemies:
+                # Asegúrate de no compararse consigo mismo
+                if other_enemy is self:
+                    continue
+                if other_enemy.x == new_x and other_enemy.y == new_y:
+                    collides_with_other_enemy = True
+                    break
+            if collides_with_other_enemy:
+                continue # Pasa al siguiente movimiento posible
+
+            # Si el código llega aquí, la nueva posición es válida y libre
+            self.x = new_x
+            self.y = new_y
+            self.game.sound_move.play() # Sonido de movimiento de enemigo
+            break # El enemigo se ha movido con éxito, sal del bucle de movimientos
+                
+               
+    # def update(self, current_map):
+    #    """Actualiza la lógica del enemigo (movimiento, etc.)."""
+    #    self.move(current_map) # Llamamos a la lógica de movimiento
+
+    def draw(self, screen, camera):
+        """Dibuja el enemigo, aplicando el desplazamiento de la cámara."""
+        enemy_rect_world = self.get_rect()
+        enemy_rect_screen = camera.apply(enemy_rect_world)
+
+        # Dibuja la imagen del enemigo si está cargada
+        if hasattr(self.game, 'enemy_image') and self.game.enemy_image:
+            screen.blit(self.game.enemy_image, enemy_rect_screen)
+        else: # Si no hay imagen, dibuja un placeholder de color (útil para depuración)
+            pygame.draw.rect(screen, RED, enemy_rect_screen) # Define RED en constants.py
