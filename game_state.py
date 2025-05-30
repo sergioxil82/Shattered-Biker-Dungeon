@@ -113,6 +113,7 @@ class PlayingState(GameState):
 
         self.show_inventory = False # Controla si el inventario se está mostrando
         self.selected_item_index = 0 # Para navegar por el inventario
+        self.awaiting_powerful_attack_target = False
 
     def handle_input(self, event):
         if event.type == pygame.KEYDOWN:
@@ -140,6 +141,17 @@ class PlayingState(GameState):
                             self.selected_item_index = min(self.selected_item_index, len(self.player.inventory) - 1)
                 return # Consumir el evento si estamos en el inventario
 
+            # --- Lógica de Habilidades (antes del movimiento/ataque normal) ---
+            if event.key == pygame.K_s: # Tecla para la habilidad
+                if self.player.cooldown_powerful_attack > 0:
+                    self.show_message("Ataque Potente en cooldown!")
+                else:
+                    # Si no está en cooldown, el jugador intentará usar la habilidad
+                    # en el próximo ataque. Necesitamos un estado para esto.
+                    self.show_message("Selecciona un enemigo para ATAQUE POTENTE.")
+                    self.awaiting_powerful_attack_target = True # <-- ¡NUEVA VARIABLE!
+                    return # Consumir el evento, no moverse todavía
+                            
             dx, dy = 0, 0
             if event.key == pygame.K_UP:
                 dy = -1
@@ -166,19 +178,22 @@ class PlayingState(GameState):
                 player_action_taken = False # Bandera para saber si el jugador realizó una acción que consuma turno
 
                 if target_enemy:
-                    # El jugador intenta moverse a la casilla de un enemigo, ¡es un ataque!
                     player_action_taken = True
-                    enemy_defeated = self.player.attack_target(target_enemy)
+                    if self.awaiting_powerful_attack_target: # Si estábamos esperando un objetivo para la habilidad
+                        enemy_defeated = self.player.attack_target(target_enemy, is_powerful_attack=True)
+                        self.awaiting_powerful_attack_target = False # Resetear la bandera
+                    else:
+                        enemy_defeated = self.player.attack_target(target_enemy)
                     
                     if enemy_defeated:
                         # Elimina al enemigo de la lista si está derrotado
                         # Hacemos una nueva lista para evitar modificarla mientras iteramos
-                        self.show_message("¡Enemigo Derrotado!")
+                        # self.show_message("¡Enemigo Derrotado!")
                         self.enemies = [e for e in self.enemies if e.is_alive]
                         print(f"Enemigo derrotado. Quedan {len(self.enemies)} enemigos.")
                         
                 else:
-                     # El jugador no intentó atacar a un enemigo.
+                    # El jugador no intentó atacar a un enemigo.
                     # Ahora, verificar si la casilla objetivo es un OBSTÁCULO.
                     collides_with_obstacle = False
                     for obstacle in self.current_map.obstacles:
@@ -196,8 +211,12 @@ class PlayingState(GameState):
                         player_action_taken = True # El jugador intentó algo, su turno se gasta.
                         print("Tile no caminable, el jugador no se mueve.")
                     else:
-                        # Si no hay enemigo, ni obstáculo, ni tile no caminable, el jugador se mueve.
-                        player_moved = self.player.move(dx, dy, self.current_map) # El método move del jugador actualiza su posición
+                        # Si el jugador se mueve, cancela la selección de habilidad
+                        if self.awaiting_powerful_attack_target:
+                            self.awaiting_powerful_attack_target = False
+                            self.show_message("Ataque Potente cancelado.")
+
+                        player_moved = self.player.move(dx, dy, self.current_map)
                         if player_moved:
                             player_action_taken = True
                             
@@ -224,7 +243,10 @@ class PlayingState(GameState):
 
                 # --- Turno de los Enemigos (si el jugador realizó una acción) ---
                 if player_action_taken:
-                    self.process_enemy_turn()                   
+                    self.process_enemy_turn()
+                    # --- Actualizar cooldowns del jugador después de su turno ---
+                    self.player.end_turn_update() 
+                   
             
             # Para probar el cambio de estado (pausa, etc.)
             if event.key == pygame.K_p:
@@ -298,35 +320,10 @@ class PlayingState(GameState):
             item_on_map_rect_world = pygame.Rect(item_on_map.x * TILE_SIZE, item_on_map.y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
             screen.blit(item_on_map.image, self.camera.apply(item_on_map_rect_world))
 
+        # Dibuja el HUD (barra de vida, etc.) 
+        self.draw_hud(screen)       
 
-
-        # --- HUD del Jugador ---
-        # 1. Texto de HP
-        font = pygame.font.Font(None, 24) # Puedes cargar una fuente real si tienes una en assets/fonts/
-        hp_text = font.render(f"HP: {self.player.current_hp}/{self.player.max_hp}", True, WHITE)
-        screen.blit(hp_text, (10, 10))
-
-        # 2. Barra de Vida (opcional, pero visualmente mejor)
-        bar_width = 100
-        bar_height = 15
-        bar_x = 10
-        bar_y = 35 # Debajo del texto de HP
-
-        # Calcular el porcentaje de vida
-        hp_percentage = self.player.current_hp / self.player.max_hp
-        current_bar_width = int(bar_width * hp_percentage)
-
-        # Dibujar el fondo de la barra (rojo oscuro)
-        pygame.draw.rect(screen, DARK_RED, (bar_x, bar_y, bar_width, bar_height))
-        # Dibujar la parte de vida (verde)
-        pygame.draw.rect(screen, GREEN, (bar_x, bar_y, current_bar_width, bar_height))
-        # Dibujar el borde de la barra
-        pygame.draw.rect(screen, WHITE, (bar_x, bar_y, bar_width, bar_height), 2) # 2 es el grosor del borde
-
-        # --- Mensajes de estado (más adelante) ---
-        # Por ahora, solo dibuja el HUD estático. Los mensajes temporales los añadiremos después.
-
-         # --- Dibujar Mensaje de Estado ---
+        # --- Dibujar Mensaje de Estado ---
         if self.message:
             message_font = pygame.font.Font(None, 36) # Fuente para el mensaje
             message_surface = message_font.render(self.message, True, YELLOW) # Define YELLOW en constants.py
@@ -335,10 +332,67 @@ class PlayingState(GameState):
             message_rect = message_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
             screen.blit(message_surface, message_rect)
         
-        # --- Dibuja Inventario si está abierto --- <-- ¡NUEVO!
+        # --- Dibuja Inventario si está abierto --- 
         if self.show_inventory:
             self.draw_inventory(screen)
         pygame.display.flip()
+
+    def draw_hud(self, screen):
+        """Dibuja la interfaz de usuario (HUD) en la pantalla."""
+        # Barra de vida
+        hp_bar_width = 150
+        hp_bar_height = 20
+        hp_bar_x = 10
+        hp_bar_y = 10
+        
+        # Color de la barra de vida (verde si está bien, amarillo si medio, rojo si bajo)
+        hp_percentage = self.player.current_hp / self.player.max_hp
+        if hp_percentage > 0.6:
+            hp_color = GREEN
+        elif hp_percentage > 0.25:
+            hp_color = YELLOW
+        else:
+            hp_color = RED
+
+        pygame.draw.rect(screen, hp_color, (hp_bar_x, hp_bar_y, hp_bar_width * hp_percentage, hp_bar_height))
+        pygame.draw.rect(screen, WHITE, (hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height), 2) # Borde blanco
+
+        # Texto de HP
+        hp_text = self.game.font.render(f"HP: {self.player.current_hp}/{self.player.max_hp}", True, WHITE)
+        screen.blit(hp_text, (hp_bar_x + hp_bar_width + 10, hp_bar_y))
+
+        # Ataque y Defensa
+        attack_text = self.game.font.render(f"Ataque: {self.player.attack}", True, WHITE)
+        defense_text = self.game.font.render(f"Defensa: {self.player.defense}", True, WHITE)
+        screen.blit(attack_text, (10, hp_bar_y + hp_bar_height + 10))
+        screen.blit(defense_text, (10, hp_bar_y + hp_bar_height + 40))
+
+        # Cooldown de Habilidad
+        skill_cooldown_text = self.game.font.render(
+            f"Ataque Potente CD: {self.player.cooldown_powerful_attack}",
+            True, WHITE if self.player.cooldown_powerful_attack == 0 else YELLOW
+        )
+        screen.blit(skill_cooldown_text, (10, SCREEN_HEIGHT - 60))
+
+        # Instrucciones de habilidad (opcional, si tienes un font_small, si no, usa el font normal)
+        # Asegúrate de tener el font_small cargado en main.py si lo usas.
+        try:
+            skill_inst_text = self.game.font_small.render("S: Ataque Potente", True, WHITE)
+        except AttributeError: # Si self.game.font_small no existe, usa el font normal
+            skill_inst_text = self.game.font.render("S: Ataque Potente", True, WHITE)
+            
+        screen.blit(skill_inst_text, (10, SCREEN_HEIGHT - 30))
+
+        # Efectos de Estado
+        y_offset_effects = SCREEN_HEIGHT - 90
+        for effect_name, effect_data in self.player.status_effects.items():
+            effect_text = self.game.font.render( # Usamos el font normal aquí, puedes ajustar
+                f"{effect_name.title()} ({effect_data['duration']}t)",
+                True, YELLOW if effect_name == "poisoned" else WHITE # Color diferente para veneno
+            )
+            # Dibuja los efectos desde la esquina inferior derecha, apilando hacia arriba
+            screen.blit(effect_text, (SCREEN_WIDTH - effect_text.get_width() - 10, y_offset_effects))
+            y_offset_effects -= 25 # Mueve el siguiente texto 25 píxeles hacia arriba
 
     def show_message(self, text):
         """Muestra un mensaje temporal en pantalla."""

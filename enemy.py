@@ -40,15 +40,21 @@ class Enemy:
             return True # Enemigo derrotado
         return False # Enemigo no derrotado
 
-    def attack_target(self, target): # Añade un método de ataque
-        """Ataca a un objetivo (jugador)."""
-        if not self.is_alive: # Un enemigo muerto no ataca
-            return
+    def attack_target(self, target_player):
+        """Ataca al jugador."""
+        damage = self.attack # Daño base del enemigo
+        actual_damage = max(0, damage - target_player.defense) # Daño real tras defensa
 
-        self.game.sound_attack.play() # Sonido de ataque del enemigo
-        print(f"Enemigo en ({self.x}, {self.y}) atacó al jugador.")
-        target_defeated = target.take_damage(self.attack)
-        return target_defeated # Devuelve si el jugador fue derrotado
+        print(f"{self.enemy_type.replace('_', ' ').title()} ataca a Player. Daño base: {damage}, Daño real: {actual_damage}")
+
+        player_defeated = target_player.take_damage(actual_damage)
+
+        # --- Lógica de efecto de estado: Veneno --- 
+        if self.enemy_type == "poisonous_crawler" and random.random() < 0.4: # 40% de probabilidad de envenenar
+            target_player.apply_effect("poisoned", duration=3, potency=5) # Envenena por 3 turnos, 5 de daño por turno
+            self.game.current_state.show_message("¡Has sido ENVENENADO!")
+
+        return player_defeated
     
     def get_rect(self):
         """Devuelve el rectángulo de posición del enemigo en coordenadas del mundo."""

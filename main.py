@@ -86,6 +86,11 @@ class Game:
             # if self.pickup_attack_image.get_width() != TILE_SIZE:
             #     self.pickup_attack_image = pygame.transform.scale(self.pickup_attack_image, (TILE_SIZE, TILE_SIZE))
 
+            # --- Carga de Fuentes ---
+            pygame.font.init() # Inicializa el módulo de fuentes de Pygame si no lo está
+            self.font = pygame.font.Font(None, 24) # Fuente principal (tamaño 24)
+            self.font_small = pygame.font.Font(None, 18) # Fuente más pequeña (tamaño 18) para instrucciones, etc.
+
             # --- Carga de sonidos ---
             self.sound_attack = pygame.mixer.Sound("assets/sounds/attack.wav")
             self.sound_hit = pygame.mixer.Sound("assets/sounds/hit.wav") # Sonido de recibir daño
@@ -134,15 +139,7 @@ class Game:
     def draw(self):
         # Delega el dibujo al estado actual
         self.current_state.draw(self.screen)
-        pygame.display.flip()
-
-        # Aquí dibujaremos todos los elementos del juego:
-        # - Fondo del nivel
-        # - Tiles
-        # - Jugador
-        # - Enemigos
-        # - Objetos
-        # - Interfaz de usuario (HUD)       
+        pygame.display.flip()        
 
     def run(self):
         while self.running:

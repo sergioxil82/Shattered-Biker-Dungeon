@@ -27,6 +27,14 @@ class Player:
         self.inventory_capacity = 8 # Capacidad del inventario
         self.equipped_weapon = None
         self.equipped_armor = None
+
+        # Habilidades y cooldowns
+        self.cooldown_powerful_attack = 0 # Turnos restantes para el cooldown
+        self.max_cooldown_powerful_attack = 5 # Cooldown de la habilidad (5 turnos)
+
+        # Efectos de estado
+        self.status_effects = {} # Diccionario: {"efecto_nombre": {"duration": X, "potency": Y}}
+
     
     def take_damage(self, damage):
         """Calcula el daño recibido y actualiza HP."""
@@ -40,15 +48,61 @@ class Player:
             self.game.sound_player_death.play() # Sonido de muerte del jugador
             return True # Jugador derrotado
         return False # Jugador no derrotado
+    # --- Métodos de Combate (modificados para incluir habilidades) ---
+    def attack_target(self, target_enemy, is_powerful_attack=False):
+        """Ataca a un enemigo, con opción de ataque potente."""
+        damage = self.attack
+        if is_powerful_attack:
+            if self.cooldown_powerful_attack > 0:
+                self.game.current_state.show_message("Ataque Potente en cooldown!")
+                return False # No se puede usar, no consume el turno
 
-    def attack_target(self, target): # Añade un método de ataque
-        """Ataca a un objetivo (enemigo)."""
-        print(f"Jugador atacó a {target.__class__.__name__} en ({target.x}, {target.y})")
-        self.game.sound_attack.play() # Sonido de ataque del jugador
-        target_defeated = target.take_damage(self.attack)
-        if target_defeated:
-            self.game.sound_enemy_death.play() # Sonido de muerte de enemigo
-        return target_defeated
+            damage *= 1.5 # 50% más de daño para el ataque potente
+            self.cooldown_powerful_attack = self.max_cooldown_powerful_attack
+            self.game.current_state.show_message(f"¡Lanzas un ATAQUE POTENTE! ({damage:.0f} daño)")
+        else:
+            self.game.current_state.show_message(f"Atacas al enemigo. ({damage} daño)")
+
+        # Aplica la defensa del enemigo
+        actual_damage = max(0, damage - target_enemy.defense)
+
+        print(f"Player ataca a {target_enemy.enemy_type}. Daño base: {damage}, Daño real: {actual_damage}")
+
+        enemy_defeated = target_enemy.take_damage(actual_damage)
+        return enemy_defeated
+
+    # --- Nuevo método para actualizar cooldowns y efectos de estado al final del turno ---
+    def end_turn_update(self):
+        """Actualiza cooldowns y duraciones de efectos de estado al final de cada turno del jugador."""
+        if self.cooldown_powerful_attack > 0:
+            self.cooldown_powerful_attack -= 1
+            if self.cooldown_powerful_attack == 0:
+                self.game.current_state.show_message("¡Ataque Potente listo!")
+
+        # Aquí se manejarían otros efectos de estado del jugador (ej. envenenado, boost de ataque temporal)
+        # Procesar efectos de estado
+        effects_to_remove = []
+        for effect_name, effect_data in list(self.status_effects.items()): # Usar list() para iterar mientras modificamos
+            if effect_name == "poisoned":
+                poison_damage = effect_data["potency"]
+                self.current_hp -= poison_damage
+                self.game.current_state.show_message(f"El veneno te daña {poison_damage} HP.")
+                print(f"Jugador envenenado. HP: {self.current_hp}/{self.max_hp}")
+                if self.current_hp <= 0:
+                    self.game.current_state.show_message("¡Has sucumbido al veneno! GAME OVER")
+                    self.game.request_state_change("game_over")
+                    return # El jugador murió, no seguir procesando
+
+            effect_data["duration"] -= 1
+            if effect_data["duration"] <= 0:
+                effects_to_remove.append(effect_name)
+                self.game.current_state.show_message(f"El efecto '{effect_name}' ha terminado.")
+
+        for effect_name in effects_to_remove:
+            del self.status_effects[effect_name]
+
+        # Asegurarse de que la HP no baje de 0 por veneno si no se pasa a game over
+        self.current_hp = max(0, self.current_hp)
     
     def move(self, dx, dy, current_map):
         """Intenta mover al jugador en dx, dy."""
@@ -149,3 +203,8 @@ class Player:
                 # Por simplicidad, lo dejamos en el inventario.
                 return False # Equipar no consume el turno
         return False # No se usó un turno
+    
+    # --- Nuevo método para aplicar efectos de estado ---
+    def apply_effect(self, effect_name, duration, potency=0):
+        self.status_effects[effect_name] = {"duration": duration, "potency": potency}
+        print(f"Efecto de estado '{effect_name}' aplicado al jugador. Duración: {duration}, Potencia: {potency}")
