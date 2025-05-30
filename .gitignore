@@ -1,0 +1,13 @@
+# Archivos de Pygame
+*.pyc
+__pycache__/
+
+# Entornos virtuales
+venv/
+.venv/
+
+# Archivos del sistema operativo (macOS, Windows, Linux)
+.DS_Store
+Thumbs.db
+*.log
+*.swp
