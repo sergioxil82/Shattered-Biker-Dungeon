@@ -43,6 +43,16 @@ class Game:
                 TILE_OBJECT: "assets/tiles/obstacle.png"
             }
            
+            self.welcome_image = pygame.image.load("assets/screens/welcome.png").convert_alpha() 
+            if self.welcome_image.get_width() != SCREEN_WIDTH or self.welcome_image.get_height() != SCREEN_HEIGHT:
+                self.welcome_image = pygame.transform.scale(self.welcome_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+            self.victory_image = pygame.image.load("assets/screens/victory.png").convert_alpha()  
+            if self.victory_image.get_width() != SCREEN_WIDTH or self.victory_image.get_height() != SCREEN_HEIGHT:
+                self.victory_image = pygame.transform.scale(self.victory_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+            self.game_over_image = pygame.image.load("assets/screens/game_over.png").convert_alpha()
+            if self.game_over_image.get_width() != SCREEN_WIDTH or self.game_over_image.get_height() != SCREEN_HEIGHT:
+                self.game_over_image = pygame.transform.scale(self.game_over_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+
             for tile_type, path in tile_paths.items():
                 image = pygame.image.load(path).convert_alpha() # .convert_alpha() para transparencia
                 # Asegúrate de que la imagen del tile tenga el tamaño correcto

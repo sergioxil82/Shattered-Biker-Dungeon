@@ -55,11 +55,17 @@ class MenuState(GameState):
     def draw(self, screen):
         screen.fill(DARK_GRAY) # Fondo oscuro
 
+         # Dibuja la imagen de bienvenida en el centro de la pantalla
+        screen_rect = screen.get_rect()
+        image_rect = self.game.welcome_image.get_rect(center=screen_rect.center)
+        screen.blit(self.game.welcome_image, image_rect)
+
+
         # Título del juego
-        font = pygame.font.Font(None, FONT_DEFAULT_SIZE_LARGE)
-        text_surface = font.render(SCREEN_TITLE, True, WHITE)
-        text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50))
-        screen.blit(text_surface, text_rect)
+        # font = pygame.font.Font(None, FONT_DEFAULT_SIZE_LARGE)
+        # text_surface = font.render(SCREEN_TITLE, True, WHITE)
+        # text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50))
+        # screen.blit(text_surface, text_rect)
 
         # Mensaje para iniciar
         font_small = pygame.font.Font(None, FONT_DEFAULT_SIZE_SMALL)
@@ -409,7 +415,12 @@ class GameOverState(GameState):
         pass # No hay lógica de actualización continua en este estado
 
     def draw(self, screen):
-        screen.fill(BLACK) # Fondo negro
+        screen.fill(RED) # Llena la pantalla con rojo o el color de fondo que prefieras
+
+        # Dibuja la imagen de derrota en el centro de la pantalla
+        screen_rect = screen.get_rect()
+        image_rect = self.game.game_over_image.get_rect(center=screen_rect.center)
+        screen.blit(self.game.game_over_image, image_rect)
         game_over_text = self.font.render("GAME OVER", True, RED)
         restart_text = self.small_font.render("Pulsa 'R' para Reiniciar o 'ESC' para Salir", True, WHITE)
 
@@ -439,7 +450,13 @@ class VictoryState(GameState):
         pass # No hay lógica de actualización continua
 
     def draw(self, screen):
-        screen.fill(BLACK) # Fondo negro
+        screen.fill(GREEN) # Llena la pantalla con verde o el color de fondo que prefieras
+
+        # Dibuja la imagen de victoria en el centro de la pantalla
+        screen_rect = screen.get_rect()
+        image_rect = self.game.victory_image.get_rect(center=screen_rect.center)
+        screen.blit(self.game.victory_image, image_rect)
+
         victory_text = self.font.render("¡VICTORIA!", True, GREEN)
         restart_text = self.small_font.render("Pulsa 'R' para Reiniciar o 'ESC' para Salir", True, WHITE)
 
