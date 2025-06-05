@@ -32,27 +32,13 @@ class Weapon(Item):
     def __init__(self, game, name, description, damage_bonus, image_path):
         super().__init__(game, name, description, "weapon", image_path)
         self.damage_bonus = damage_bonus # Bono de daño que proporciona esta arma
-
-    def equip(self, player):
-        """Equipa esta arma al jugador."""
-        player.equipped_weapon = self # Asigna esta arma al jugador
-        player.attack = player.base_attack + self.damage_bonus # Actualiza el ataque del jugador
-        self.game.current_state.show_message(f"Equipaste {self.name} (+{self.damage_bonus} daño)!")
-        print(f"Jugador equipó {self.name}. Nuevo ataque: {player.attack}")
-        return True # El equipamiento no consume el turno
+    
 
 class Armor(Item):
     def __init__(self, game, name, description, defense_bonus, image_path):
         super().__init__(game, name, description, "armor", image_path)
         self.defense_bonus = defense_bonus # Bono de defensa que proporciona esta armadura
-
-    def equip(self, player):
-        """Equipa esta armadura al jugador."""
-        player.equipped_armor = self # Asigna esta armadura al jugador
-        player.defense = player.base_defense + self.defense_bonus # Actualiza la defensa del jugador
-        self.game.current_state.show_message(f"Equipaste {self.name} (+{self.defense_bonus} defensa)!")
-        print(f"Jugador equipó {self.name}. Nueva defensa: {player.defense}")
-        return True # El equipamiento no consume el turno
+   
 
 class Consumable(Item):
     def __init__(self, game, name, description, effect, image_path):

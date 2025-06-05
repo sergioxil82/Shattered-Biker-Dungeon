@@ -103,36 +103,22 @@ class PlayingState(GameState):
         self.message = ""
         self.message_timer = 0 # Tiempo restante para mostrar el mensaje
         self.message_duration = 2000 # Duración en milisegundos (2 segundos)
-
-        self.show_inventory = False # Controla si el inventario se está mostrando
-        self.selected_item_index = 0 # Para navegar por el inventario
+       
         self.awaiting_powerful_attack_target = False
 
     def handle_input(self, event):
         if event.type == pygame.KEYDOWN:
-            # --- Lógica de Inventario (antes de las acciones de movimiento) ---
+            # --- Lógica de Inventario ---
             if event.key == pygame.K_i:
-                self.show_inventory = not self.show_inventory # Alternar inventario
-                self.selected_item_index = 0 # Resetear selección al abrir/cerrar
+                self.player.inventory.toggle_open()
                 return # No hacer nada más si abrimos/cerramos inventario
 
-            if self.show_inventory:
-                if event.key == pygame.K_UP:
-                    self.selected_item_index = max(0, self.selected_item_index - 1)
-                elif event.key == pygame.K_DOWN:
-                    self.selected_item_index = min(len(self.player.inventory) - 1, self.selected_item_index + 1)
-                elif event.key == pygame.K_RETURN: # Tecla Enter para usar/equipar
-                    if len(self.player.inventory) > 0:
-                        # Intenta usar/equipar el ítem, y si consume turno, pasa el turno a enemigos
-                        action_consumed_turn = self.player.use_item_from_inventory(self.selected_item_index)
-                        if action_consumed_turn:
-                            self.process_enemy_turn() # Pasar el turno a los enemigos
-                        # Si el inventario se queda vacío después de usar, resetear selección
-                        if len(self.player.inventory) == 0:
-                            self.selected_item_index = 0
-                        else: # Ajustar el índice si el ítem usado fue el último
-                            self.selected_item_index = min(self.selected_item_index, len(self.player.inventory) - 1)
-                return # Consumir el evento si estamos en el inventario
+            if self.player.inventory.is_open:
+                action_consumed_turn = self.player.inventory.handle_input(event)
+                if action_consumed_turn:
+                    self.process_enemy_turn()
+                return # Consumir el evento si el inventario lo manejó
+           
 
             # --- Lógica de Habilidades (antes del movimiento/ataque normal) ---
             if event.key == pygame.K_s: # Tecla para la habilidad
@@ -225,7 +211,7 @@ class PlayingState(GameState):
                             items_to_remove = []
                             for item_on_map in self.items_on_map:
                                 if self.player.x == item_on_map.x and self.player.y == item_on_map.y:
-                                    if self.player.add_item(item_on_map): # Intentar añadir al inventario
+                                    if self.player.inventory.add_item(item_on_map): # Usar inventario del jugador
                                         items_to_remove.append(item_on_map)
                                         # Suena un sonido de recogida
                                         self.game.sound_pickup.play()
@@ -324,11 +310,10 @@ class PlayingState(GameState):
             # Centrar el mensaje en la pantalla
             message_rect = message_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2))
             screen.blit(message_surface, message_rect)
+                
+        # --- Dibuja Inventario si está abierto (delegado al inventario del jugador) ---
+        self.player.inventory.draw(screen) # El inventario solo se dibuja si is_open es True
         
-        # --- Dibuja Inventario si está abierto --- 
-        if self.show_inventory:
-            self.draw_inventory(screen)
-        pygame.display.flip()
 
     def draw_hud(self, screen):
         """Dibuja la interfaz de usuario (HUD) en la pantalla."""
@@ -561,70 +546,6 @@ class PlayingState(GameState):
             self.items_on_map.append(item)
 
         print(f"Colocados {len(self.items_on_map)} ítems en el mapa.")
-
-    # --- Nuevo método para dibujar el inventario ---
-    def draw_inventory(self, screen):
-        inventory_width = 300
-        inventory_height = 400
-        inventory_x = (SCREEN_WIDTH - inventory_width) // 2
-        inventory_y = (SCREEN_HEIGHT - inventory_height) // 2
-        inventory_rect = pygame.Rect(inventory_x, inventory_y, inventory_width, inventory_height)
-
-        # Fondo del inventario
-        pygame.draw.rect(screen, GRAY, inventory_rect)
-        pygame.draw.rect(screen, WHITE, inventory_rect, 2) # Borde
-
-        # Título
-        title_font = pygame.font.Font(None, 36)
-        title_text = title_font.render("Inventario", True, BLACK)
-        screen.blit(title_text, (inventory_x + 10, inventory_y + 10))
-
-        # Items en el inventario
-        item_font = pygame.font.Font(None, 24)
-        y_offset = inventory_y + 50
-        for i, item in enumerate(self.player.inventory):
-            text_color = YELLOW if i == self.selected_item_index else BLACK
-            item_text = item_font.render(f"{item.name} ({item.item_type})", True, text_color)
-            screen.blit(item_text, (inventory_x + 20, y_offset + i * 30))
-
-            # Mostrar estadísticas del ítem seleccionado (opcional)
-            if i == self.selected_item_index:
-                desc_font = pygame.font.Font(None, 18)
-                desc_text = desc_font.render(item.description, True, BLACK)
-                screen.blit(desc_text, (inventory_x + 20, y_offset + i * 30 + 20)) # Debajo del nombre
-
-                # Si es arma/armadura, mostrar bonus
-                if item.item_type == "weapon":
-                    bonus_text = desc_font.render(f"Daño: +{item.damage_bonus}", True, BLACK)
-                    screen.blit(bonus_text, (inventory_x + inventory_width - 100, y_offset + i * 30))
-                elif item.item_type == "armor":
-                    bonus_text = desc_font.render(f"Defensa: +{item.defense_bonus}", True, BLACK)
-                    screen.blit(bonus_text, (inventory_x + inventory_width - 100, y_offset + i * 30))
-                elif item.item_type == "consumable" and item.effect.get("heal"):
-                    bonus_text = desc_font.render(f"Cura: {item.effect['heal']} HP", True, BLACK)
-                    screen.blit(bonus_text, (inventory_x + inventory_width - 100, y_offset + i * 30))
-
-        # Estadísticas del jugador
-        stat_y_offset = inventory_y + inventory_height - 100
-        screen.blit(item_font.render(f"HP: {self.player.current_hp}/{self.player.max_hp}", True, BLACK), (inventory_x + 20, stat_y_offset))
-        screen.blit(item_font.render(f"Ataque: {self.player.attack} (Base: {self.player.base_attack})", True, BLACK), (inventory_x + 20, stat_y_offset + 30))
-        screen.blit(item_font.render(f"Defensa: {self.player.defense} (Base: {self.player.base_defense})", True, BLACK), (inventory_x + 20, stat_y_offset + 60))
-
-        # Equipo actual
-        equipped_y_offset = inventory_y + 50
-        screen.blit(item_font.render("Arma Equipada:", True, BLACK), (inventory_x + inventory_width - 150, equipped_y_offset))
-        weapon_name = self.player.equipped_weapon.name if self.player.equipped_weapon else "Ninguna"
-        screen.blit(item_font.render(weapon_name, True, BLACK), (inventory_x + inventory_width - 150, equipped_y_offset + 20))
-
-        screen.blit(item_font.render("Armadura Equipada:", True, BLACK), (inventory_x + inventory_width - 150, equipped_y_offset + 60))
-        armor_name = self.player.equipped_armor.name if self.player.equipped_armor else "Ninguna"
-        screen.blit(item_font.render(armor_name, True, BLACK), (inventory_x + inventory_width - 150, equipped_y_offset + 80))
-
-        # Instrucciones
-        instructions_font = pygame.font.Font(None, 20)
-        instructions_text = instructions_font.render("Flechas: Mover, Enter: Usar/Equipar, I: Cerrar", True, BLACK)
-        screen.blit(instructions_text, (inventory_x + 10, inventory_y + inventory_height - 25))
-
 
 class GameOverState(GameState):
     def __init__(self, game):

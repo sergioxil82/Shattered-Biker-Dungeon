@@ -1,13 +1,41 @@
-# Archivos de Pygame
+# Archivos de Python compilados y caché
 *.pyc
 __pycache__/
+*.pyo
+*.pyd
 
 # Entornos virtuales
+# Si tu entorno se llama 'venv'
 venv/
+# Si tu entorno se llama '.venv'
 .venv/
+# Otros nombres comunes de entornos
+env/
+.env/
+*/env/
+*/.env/
 
 # Archivos del sistema operativo (macOS, Windows, Linux)
 .DS_Store
 Thumbs.db
+
+# Archivos de log
 *.log
+logs/
+*.log.*
+
+# Archivos temporales o de swap de editores
 *.swp
+*~
+*.tmp
+
+# Archivos específicos de IDEs (opcional, pero útil si colaboras)
+.vscode/ # Configuración de VS Code (puedes querer versionar algunas cosas, pero no todo)
+.idea/ # Para PyCharm u otros IDEs de JetBrains
+
+# Archivos de dependencias (si usas pip freeze > requirements.txt, no necesitas versionar las bibliotecas mismas)
+# Esto es más para cuando las bibliotecas se instalan directamente en el proyecto,
+# lo cual no es la práctica recomendada con entornos virtuales.
+# /dist/
+# /build/
+# *.egg-info/
