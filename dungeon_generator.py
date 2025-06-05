@@ -1,6 +1,7 @@
 # dungeon_generator.py
 import random
 import pygame
+from room import Room
 from utils.constants import *
 from objects import Obstacle 
 
@@ -15,32 +16,21 @@ class Map:
         self.exit_pos = None # Asegúrate de que exit_pos esté inicializado
         self.obstacles = []
         self.room_rects = [] 
-
-        # Listas para almacenar las posiciones de los tiles para dibujar texturas
-        self.road_tiles_to_draw = []
-        self.wall_tiles_to_draw = []
-        self.abyss_tiles_to_draw = []
-        self.entrance_tile_to_draw = None
-        self.exit_tile_to_draw = None
-
-    # Ayudante: Para crear una habitación (rellena un área con tiles)
-    def _create_room(self, x1, y1, x2, y2, tile_type):
-        for x in range(min(x1, x2), max(x1, x2) + 1):
-            for y in range(min(y1, y2), max(y1, y2) + 1):
-                if 0 <= x < self.width and 0 <= y < self.height:
-                    self.tiles[x][y] = tile_type
+   
 
     # Ayudante: Para crear un pasillo horizontal
     def _create_h_tunnel(self, x1, x2, y, tile_type):
         for x in range(min(x1, x2), max(x1, x2) + 1):
             if 0 <= x < self.width and 0 <= y < self.height:
-                self.tiles[x][y] = tile_type
+                if self.tiles[x][y] != TILE_GARAGE_FLOOR:
+                    self.tiles[x][y] = tile_type
 
     # Ayudante: Para crear un pasillo vertical
     def _create_v_tunnel(self, y1, y2, x, tile_type):
         for y in range(min(y1, y2), max(y1, y2) + 1):
             if 0 <= x < self.width and 0 <= y < self.height:
-                self.tiles[x][y] = tile_type
+                if self.tiles[x][y] != TILE_GARAGE_FLOOR:
+                    self.tiles[x][y] = tile_type
 
     def generate_dungeon(self, max_rooms=10, min_room_size=6, max_room_size=12):
         """Genera una mazmorra con habitaciones y pasillos."""
@@ -55,19 +45,20 @@ class Map:
             y = random.randint(1, self.height - h - 1)
 
             # Crea un rectángulo para representar la habitación
-            new_room = pygame.Rect(x, y, w, h)
-
+            #new_room = pygame.Rect(x, y, w, h)
+            new_room = Room(self.game, x, y, w, h, num_rooms)
             # Comprueba si se solapa con otras habitaciones
+            
             intersects = False
-            for other_room in rooms:
-                if new_room.inflate(-2, -2).colliderect(other_room):
+            for other_room in rooms:                
+                if new_room.intersect(other_room):                    
                     intersects = True
                     break
 
             if not intersects:
                 # Si no se solapa, crea la habitación
-                self._create_room(new_room.left, new_room.top, new_room.right, new_room.bottom, TILE_ROAD)
-
+                # self._create_room(new_room.left, new_room.top, new_room.right, new_room.bottom, TILE_ROAD)
+                new_room.create_room(self.tiles, TILE_GARAGE_FLOOR)
                 # Opcional: poner paredes alrededor de la habitación
                 # Esto es más complejo si las habitaciones se solapan con pasillos,
                 # por ahora simplificamos dejando TILE_ABYSS o TILE_WALL por defecto.
@@ -113,14 +104,7 @@ class Map:
         for x in range(self.width):
             for y in range(self.height):
                 if self.tiles[x][y] == TILE_ABYSS: # Solo si sigue siendo abismo
-                    self.tiles[x][y] = TILE_ABYSS # Convierte el abismo no usado en pared
-
-        # Reinicia la lista de obstáculos y enemigos al generar un nuevo mapa
-        self.obstacles = [] # Vacía la lista de obstáculos al generar un nuevo mapa
-
-        # Esto generará un mapa más interesante.
-        # Podrías añadir lógica aquí para colocar obstáculos aleatoriamente en TILE_ROAD,
-        # o colocar enemigos una vez que el mapa esté listo.
+                    self.tiles[x][y] = TILE_ABYSS # Convierte el abismo no usado en pared      
 
     def get_tile_at(self, x, y):
         # Esta función es crucial para is_walkable.

@@ -163,7 +163,7 @@ class Player:
         if len(self.inventory) < self.inventory_capacity:
             self.inventory.append(item)
             self.game.current_state.show_message(f"Recogiste: {item.name}")
-            print(f"Item '{item.name}' añadido al inventario. Items: {self.inventory}")
+            print(f"Item '{item.name}' añadido al inventario.")
             return True
         else:
             self.game.current_state.show_message("Inventario lleno!")

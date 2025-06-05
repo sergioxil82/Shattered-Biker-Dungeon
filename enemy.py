@@ -67,7 +67,9 @@ class Enemy:
         Ahora, evita colisionar con obstáculos, el jugador y otros enemigos.
         """
         possible_moves = [(0, -1), (0, 1), (-1, 0), (1, 0)] # Arriba, Abajo, Izquierda, Derecha
-        random.shuffle(possible_moves) # Mezcla los movimientos para aleatoriedad
+        # El enemigo no se movera hasta que no este cerca el jugador
+        if abs(self.x - player_pos[0]) > 5 or abs(self.y - player_pos[1]) > 5:
+            return
 
         for dx, dy in possible_moves:
             new_x = self.x + dx
@@ -124,12 +126,22 @@ class Enemy:
         enemy_rect_screen = camera.apply(enemy_rect_world)
 
         # Dibuja la imagen del enemigo si está cargada
-        if hasattr(self.game, 'enemy_image') and self.game.enemy_image:
-            screen.blit(self.game.enemy_image, enemy_rect_screen)
+        if hasattr(self.game, 'enemy_image') and self.image:
+            screen.blit(self.image, enemy_rect_screen)
         else: # Si no hay imagen, dibuja un placeholder de color (útil para depuración)
             pygame.draw.rect(screen, RED, enemy_rect_screen) # Define RED en constants.py
+        
+        # Dibujar la barra de vida del enemigo
+        if self.current_hp > 0:
+            health_ratio = self.current_hp / self.max_hp
+            health_bar_width = int(self.width * health_ratio)
+            health_bar_rect = pygame.Rect(self.x * TILE_SIZE, self.y * TILE_SIZE - 5, health_bar_width, 5)
+            health_bar_rect = camera.apply(health_bar_rect)
+            pygame.draw.rect(screen, GREEN, health_bar_rect)
+            
 
-    def load_stats_and_image_by_type(self):
+    def load_stats_and_image_by_type(self):        
+        
         if self.enemy_type == "basic_grunt":
             self.max_hp = 30
             self.current_hp = 30
@@ -146,9 +158,10 @@ class Enemy:
             # Necesitarías cargar una imagen específica para este tipo de enemigo en main.py
             # o tener una imagen más genérica y escalarla/tintarla
             self.image = self.game.heavy_hitter_image # <-- Necesitarías cargar esta en main.py
-            if not hasattr(self.game, 'heavy_hitter_image'):
+           
+            if not hasattr(self.game, 'heavy_hitter_image'):               
                 self.image = self.game.enemy_image # Fallback si no está cargada
-
+      
         # Añade más tipos de enemigos aquí
         # elif self.enemy_type == "fast_scout":
         #     self.max_hp = 20

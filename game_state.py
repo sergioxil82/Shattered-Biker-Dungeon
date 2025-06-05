@@ -59,14 +59,7 @@ class MenuState(GameState):
          # Dibuja la imagen de bienvenida en el centro de la pantalla
         screen_rect = screen.get_rect()
         image_rect = self.game.welcome_image.get_rect(center=screen_rect.center)
-        screen.blit(self.game.welcome_image, image_rect)
-
-
-        # Título del juego
-        # font = pygame.font.Font(None, FONT_DEFAULT_SIZE_LARGE)
-        # text_surface = font.render(SCREEN_TITLE, True, WHITE)
-        # text_rect = text_surface.get_rect(center=(SCREEN_WIDTH // 2, SCREEN_HEIGHT // 2 - 50))
-        # screen.blit(text_surface, text_rect)
+        screen.blit(self.game.welcome_image, image_rect)       
 
         # Mensaje para iniciar
         font_small = pygame.font.Font(None, FONT_DEFAULT_SIZE_SMALL)
