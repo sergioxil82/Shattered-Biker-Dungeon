@@ -75,26 +75,25 @@ class PlayingState(GameState):
         
         # --- Inicialización del Mapa y Jugador ---
         # Inicializa el mapa
-        self.current_map = Map(self.game, MAP_WIDTH, MAP_HEIGHT)
-        self.current_map.generate_dungeon() # Genera el mapa
+        self.current_map = Map(self.game, MAP_WIDTH, MAP_HEIGHT) # Primero crea el objeto mapa
+
+        
+        
+        # Inicializa las listas     
+        self.enemies = [] 
+        self.pickups = []
+        self.items_on_map = []       
+        
+        self.current_map.generate_dungeon(self) # Genera el mapa y su contenido (enemigos, items)
 
         # Inicializa el jugador
         self.player = Player(self.game,
                             self.current_map.player_start_pos[0],
                             self.current_map.player_start_pos[1])
         
-        # Inicializa las listas     
-        self.enemies = [] 
-        self.pickups = []
-        self.items_on_map = []
-        
-        self.place_enemies()
-        self.place_enemies() # Ahora un método
         self.place_obstacles() # <-- Llama a un método para colocar obstáculos
         self.place_pickups() # <-- Nuevo método para colocar pickups
-        self.place_items_on_map()
-
-
+        
         # --- Inicialización de la Cámara ---
         self.camera = Camera(self.player, self.current_map.width, self.current_map.height)
         self.camera.update() # Asegura que la cámara se centre en el jugador al inicio
@@ -237,14 +236,8 @@ class PlayingState(GameState):
         enemies_to_process = list(self.enemies)
         for enemy in enemies_to_process:
             if enemy.is_alive:
-                if abs(enemy.x - self.player.x) + abs(enemy.y - self.player.y) == 1:
-                    player_defeated = enemy.attack_target(self.player)
-                    if player_defeated:
-                        self.show_message("¡Has sido Derrotado! GAME OVER")
-                        self.game.request_state_change("game_over")
-                        return # Salir si el jugador pierde
-                else:
-                    enemy.move(self.current_map, (self.player.x, self.player.y), self.enemies)
+               enemy.update_ai(self.player, self.current_map, self.enemies)
+               # La lógica de ataque ahora está dentro de enemy.update_ai -> _behavior_attack 
 
         # Actualiza la cámara después de que todos los movimientos/acciones de los enemigos han terminado
         self.camera.update()
@@ -377,42 +370,6 @@ class PlayingState(GameState):
         self.message = text
         self.message_timer = self.message_duration
 
-    def place_enemies(self):
-        """Coloca enemigos en el mapa después de la generación."""
-        self.enemies = [] # Asegurarse de que la lista esté vacía antes de añadir nuevos
-        
-        # Recopila todas las posiciones de la carretera válidas para enemigos
-        valid_spawn_tiles = []
-        for x in range(self.current_map.width):
-            for y in range(self.current_map.height):
-                # Si es un tile de carretera, NO es la posición del jugador, ni la salida
-                if self.current_map.tiles[x][y] == TILE_ROAD and \
-                   (x, y) != self.current_map.player_start_pos and \
-                   (x, y) != self.current_map.exit_pos:
-                    # Además, verifica que no haya un obstáculo en esta posición (en un futuro, otros pickups, etc.)
-                    is_occupied_by_obstacle = False
-                    for obstacle in self.current_map.obstacles:
-                        if obstacle.x == x and obstacle.y == y:
-                            is_occupied_by_obstacle = True
-                            break
-                    if not is_occupied_by_obstacle:
-                        valid_spawn_tiles.append((x, y))
-
-        num_enemies_to_add = 5 # Puedes ajustar este número
-        random.shuffle(valid_spawn_tiles)
-        
-        for i in range(min(num_enemies_to_add, len(valid_spawn_tiles))):
-            enemy_x, enemy_y = valid_spawn_tiles[i]
-            # Decidir aleatoriamente el tipo de enemigo
-            enemy_type = "basic_grunt"
-            if random.random() < 0.3: # 30% de probabilidad de ser un Heavy Hitter
-                enemy_type = "heavy_hitter"
-            # Puedes añadir más condiciones para otros tipos de enemigos aquí
-
-            self.enemies.append(Enemy(self.game, enemy_x, enemy_y, enemy_type))            
-        
-        print(f"Colocados {len(self.enemies)} enemigos en el mapa.")
-
 
     def place_obstacles(self):
         """Coloca obstáculos en el mapa, preferiblemente dentro de las habitaciones,
@@ -423,8 +380,8 @@ class PlayingState(GameState):
         
         # Iterar sobre los tiles dentro de cada habitación
         for room_rect in self.current_map.room_rects:
-            for x in range(room_rect.left, room_rect.right + 1):
-                for y in range(room_rect.top, room_rect.bottom + 1):
+            for x in range(room_rect.left, room_rect.right):
+                for y in range(room_rect.top, room_rect.bottom):
                     # Asegurarse de que sea un tile caminable (road o garage_floor)
                     # Y que no sea la posición del jugador, ni la salida.
                     if self.current_map.is_walkable(x, y) and \
@@ -433,7 +390,7 @@ class PlayingState(GameState):
                         valid_obstacle_tiles.append((x, y))
 
         random.shuffle(valid_obstacle_tiles)
-        num_obstacles_to_add = 5 # Ajusta el número según lo desees
+        num_obstacles_to_add = random.randint(3, 7) # Cantidad de obstáculos a colocar
         
         for i in range(min(num_obstacles_to_add, len(valid_obstacle_tiles))):
             ox, oy = valid_obstacle_tiles[i]
@@ -447,8 +404,9 @@ class PlayingState(GameState):
             if is_occupied:
                 continue # Pasa al siguiente tile si ya está ocupado por un enemigo
 
-            for pickup in self.pickups: # Aunque los pickups se colocan después, esta verificación es buena para futuras expansiones
-                if pickup.x == ox and pickup.y == oy and not pickup.is_collected:
+           # Comprobar también ítems en el mapa
+            for item_on_map in self.items_on_map:
+                if item_on_map.x == ox and item_on_map.y == oy:
                     is_occupied = True
                     break
             if is_occupied:
@@ -492,60 +450,6 @@ class PlayingState(GameState):
             self.pickups.append(Pickup(self.game, px, py, "health_potion")) # Crea una poción de vida
 
         print(f"Colocados {len(self.pickups)} pickups.")
-
-    def place_items_on_map(self):
-        """Coloca ítems (armas, armaduras, consumibles) en el mapa."""
-        self.items_on_map = []
-        valid_item_spawn_tiles = []
-
-        for room_rect in self.current_map.room_rects:
-            for x in range(room_rect.left, room_rect.right + 1):
-                for y in range(room_rect.top, room_rect.bottom + 1):
-                    # Evita superposición con jugador, salida, obstáculos, enemigos y pickups existentes
-                    if self.current_map.is_walkable(x, y) and \
-                    (x, y) != self.player.x and (x, y) != self.player.y and \
-                    (x, y) != self.current_map.exit_pos:
-
-                        is_occupied = False
-                        for obstacle in self.current_map.obstacles:
-                            if obstacle.x == x and obstacle.y == y:
-                                is_occupied = True
-                                break
-                        if is_occupied: continue
-
-                        for enemy in self.enemies:
-                            if enemy.x == x and enemy.y == y:
-                                is_occupied = True
-                                break
-                        if is_occupied: continue
-
-                        for pickup in self.pickups:
-                            if pickup.x == x and pickup.y == y and not pickup.is_collected:
-                                is_occupied = True
-                                break
-                        if is_occupied: continue
-
-                        valid_item_spawn_tiles.append((x, y))
-
-        random.shuffle(valid_item_spawn_tiles)
-
-        # Ejemplos de ítems para colocar
-        items_to_spawn = [
-            Weapon(self.game, "Llave Inglesa", "Un arma de mano oxidada.", 5, "assets/items/wrench.png"),
-            Armor(self.game, "Chaleco Cuero", "Protección básica de motero.", 3, "assets/items/leather_vest.png"),
-            Consumable(self.game, "Café Turbo", "Te da un subidón de energía.", {"heal": 10}, "assets/items/coffee.png"),
-            Weapon(self.game, "Bate con Clavos", "¡Duele mucho!", 10, "assets/items/spiked_bat.png")
-        ]
-
-        for i in range(min(len(items_to_spawn), len(valid_item_spawn_tiles))):
-            item = items_to_spawn[i]
-            ix, iy = valid_item_spawn_tiles[i]
-            # Le damos al ítem una posición para que se pueda dibujar
-            item.x = ix
-            item.y = iy
-            self.items_on_map.append(item)
-
-        print(f"Colocados {len(self.items_on_map)} ítems en el mapa.")
 
 class GameOverState(GameState):
     def __init__(self, game):

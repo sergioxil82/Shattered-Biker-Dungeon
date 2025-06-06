@@ -32,7 +32,7 @@ class Map:
                 if self.tiles[x][y] != TILE_GARAGE_FLOOR:
                     self.tiles[x][y] = tile_type
 
-    def generate_dungeon(self, max_rooms=10, min_room_size=6, max_room_size=12):
+    def generate_dungeon(self, playing_state, max_rooms=10, min_room_size=6, max_room_size=12):
         """Genera una mazmorra con habitaciones y pasillos."""
         rooms = []
         num_rooms = 0
@@ -85,6 +85,9 @@ class Map:
                         self._create_v_tunnel(prev_y, new_y, prev_x, TILE_ROAD)
                         self._create_h_tunnel(prev_x, new_x, new_y, TILE_ROAD)
 
+                 # --- Generar contenido de la habitación ---
+                new_room.generate_contents(playing_state) # Pasar la instancia de PlayingState
+                
                 rooms.append(new_room)
                 num_rooms += 1
 
@@ -105,7 +108,14 @@ class Map:
             for y in range(self.height):
                 if self.tiles[x][y] == TILE_ABYSS: # Solo si sigue siendo abismo
                     self.tiles[x][y] = TILE_ABYSS # Convierte el abismo no usado en pared      
-
+    
+    def get_room_at(self, x, y):
+        """Devuelve el objeto Room en las coordenadas (x,y) o None si no está en ninguna habitación."""
+        for room in self.room_rects: # room_rects es una lista de objetos Room
+            if room.collidepoint(x, y): # pygame.Rect.collidepoint usa coordenadas de tile aquí
+                return room
+        return None
+    
     def get_tile_at(self, x, y):
         # Esta función es crucial para is_walkable.
         # Si las coordenadas están fuera de los límites del mapa, es ABISMO.
