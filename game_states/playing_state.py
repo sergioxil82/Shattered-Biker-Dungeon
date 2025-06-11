@@ -271,17 +271,23 @@ class PlayingState(GameState):
         self.pickups = []
         valid_spawn_tiles = []
 
-        for x_coord in range(self.current_map.width):
-            for y_coord in range(self.current_map.height):
-                # Permitir pickups en TILE_ROAD o TILE_GARAGE_FLOOR
-                tile_type = self.current_map.get_tile_at(x_coord, y_coord)
-                if (tile_type == TILE_ROAD or tile_type == TILE_GARAGE_FLOOR) and \
-                   (x_coord, y_coord) != self.current_map.player_start_pos and \
-                   (x_coord, y_coord) != self.current_map.exit_pos:
-                    
-                    is_occupied = any(obs.x == x_coord and obs.y == y_coord for obs in self.current_map.obstacles) or \
-                                  any(enemy.x == x_coord and enemy.y == y_coord for enemy in self.enemies) or \
-                                  any(item.x == x_coord and item.y == y_coord for item in self.items_on_map)
+        # Iterar solo sobre los tiles dentro de las habitaciones
+        for room_rect in self.current_map.room_rects:
+            # No generar pickups en la habitación inicial (donde empieza el jugador)
+            if room_rect.level == 0: # Asumiendo que la habitación inicial tiene level 0
+                continue
+
+            for x_coord in range(room_rect.left, room_rect.right):
+                for y_coord in range(room_rect.top, room_rect.bottom):
+                    # Asegurarse de que no sea la posición de inicio del jugador ni la salida, y que sea caminable
+                    if self.current_map.is_walkable(x_coord, y_coord) and \
+                       (x_coord, y_coord) != self.current_map.player_start_pos and \
+                       (x_coord, y_coord) != self.current_map.exit_pos:
+                        
+                        is_occupied = any(obs.x == x_coord and obs.y == y_coord for obs in self.current_map.obstacles) or \
+                                      any(enemy.x == x_coord and enemy.y == y_coord for enemy in self.enemies) or \
+                                      any(item.x == x_coord and item.y == y_coord for item in self.items_on_map)
+
 
                     if not is_occupied:
                         valid_spawn_tiles.append((x_coord, y_coord))

@@ -91,8 +91,11 @@ class Inventory:
             return False 
 
         action_consumed_turn = False
-        if item.item_type == "consumable":
-            if item.use(self.owner): 
+        if item.item_type == "consumable":            
+            # Pasar self.owner (Player) y self.owner.game.persistent_motorcycle (Motorcycle)
+            # El método use del item decidirá a quién aplicar el efecto.
+            motorcycle_instance = self.owner.game.persistent_motorcycle if hasattr(self.owner.game, 'persistent_motorcycle') else None
+            if item.use(self.owner, motorcycle_instance):
                 self.remove_item(self.selected_item_index)
                 action_consumed_turn = True 
         elif item.item_type in ["weapon", "armor"]:
@@ -161,7 +164,10 @@ class Inventory:
                 stat_text = ""
                 if item.item_type == "weapon": stat_text = f"Daño: +{item.damage_bonus}"
                 elif item.item_type == "armor": stat_text = f"Defensa: +{item.defense_bonus}"
-                elif item.item_type == "consumable" and item.effect.get("heal"): stat_text = f"Cura: {item.effect['heal']} HP"
+                elif item.item_type == "consumable":
+                    if item.effect.get("heal"): stat_text = f"Cura: {item.effect['heal']} HP"
+                    elif item.effect.get("refuel"): stat_text = f"Rellena: {item.effect['refuel']} Comb."
+                
                 
                 if stat_text:
                     stat_surf = self.font_desc.render(stat_text, True, BLUE)

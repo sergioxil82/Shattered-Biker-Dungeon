@@ -19,7 +19,7 @@ class Item:
             self.image = pygame.Surface((TILE_SIZE, TILE_SIZE))
             self.image.fill(PURPLE) # Un color de placeholder
 
-    def use(self, player):
+    def use(self, player, motorcycle=None):
         """Método placeholder. Las subclases implementarán su propia lógica."""
         print(f"Usando {self.name}...")
         self.game.current_state.show_message(f"Usas el {self.name}!")
@@ -45,7 +45,7 @@ class Consumable(Item):
         super().__init__(game, name, description, "consumable", image_path)
         self.effect = effect # Un diccionario o función para el efecto (ej. {"heal": 20})
 
-    def use(self, player):
+    def use(self, player, motorcycle=None):
         """Usa este consumible y aplica su efecto."""
         if self.effect.get("heal"):
             heal_amount = self.effect["heal"]
@@ -54,9 +54,11 @@ class Consumable(Item):
             print(f"Jugador se curó. HP: {player.current_hp}/{player.max_hp}")
             self.game.sound_pickup.play() # Reusar el sonido de pickup para curar
 
-        # Aquí puedes añadir más efectos de consumibles
-        # if self.effect.get("attack_boost"):
-        #     player.attack += self.effect["attack_boost"]
-        #     self.game.current_state.show_message("¡Ataque Aumentado!")
+        elif self.effect.get("refuel") and motorcycle: # Comprobar que motorcycle no sea None
+            refuel_amount = self.effect["refuel"]
+            motorcycle.refuel(refuel_amount)
+            self.game.current_state.show_message(f"¡Moto reabastecida +{refuel_amount} comb.!")
+            print(f"Moto reabastecida. Combustible: {motorcycle.fuel_current}/{motorcycle.fuel_max}")
+            # Podrías añadir un sonido específico para reabastecer
 
         return True # El uso de un consumible generalmente consume el turno

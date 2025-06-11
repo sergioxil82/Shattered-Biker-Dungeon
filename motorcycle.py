@@ -15,3 +15,4 @@ class Motorcycle:
         self.fuel_current += amount
         if self.fuel_current > self.fuel_max:
             self.fuel_current = self.fuel_max
+        print(f"Moto reabastecida. Combustible actual: {self.fuel_current}/{self.fuel_max}")

@@ -66,7 +66,8 @@ class Room(pygame.Rect):
             Weapon(self.game, "Llave Inglesa", "Un arma de mano oxidada.", 5, "assets/items/wrench.png"),
             Armor(self.game, "Chaleco Cuero", "Protección básica de motero.", 3, "assets/items/leather_vest.png"),
             Consumable(self.game, "Café Turbo", "Te da un subidón de energía.", {"heal": 10}, "assets/items/coffee.png"),
-            Weapon(self.game, "Bate con Clavos", "¡Duele mucho!", 10, "assets/items/spiked_bat.png")
+            Weapon(self.game, "Bate con Clavos", "¡Duele mucho!", 10, "assets/items/spiked_bat.png"),
+            Consumable(self.game, "Bidón Gasolina", "Rellena combustible de la moto.", {"refuel": 50}, "assets/items/gas_can.png")
         ]
         for _ in range(num_items_to_spawn):
             if not possible_spawn_points or not available_items: break
