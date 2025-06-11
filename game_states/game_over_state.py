@@ -1,7 +1,7 @@
 # game_states/game_over_state.py
 import pygame
 from .base_state import GameState
-from utils.constants import * # Ajusta según tu estructura
+from utils.constants import * # Cambio a importación absoluta
 
 class GameOverState(GameState):
     def __init__(self, game):
@@ -17,6 +17,7 @@ class GameOverState(GameState):
                     del self.game.persistent_player
                 if hasattr(self.game, 'persistent_motorcycle'):
                     del self.game.persistent_motorcycle
+                self.game.target_level_number = 1 # Resetear al nivel 1 al reiniciar
                 self.game.request_state_change("playing")
             elif event.key == pygame.K_ESCAPE:
                 self.game.running = False

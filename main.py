@@ -1,7 +1,7 @@
 import pygame
 import sys
 from utils.constants import *
-from game_states import MenuState, PlayingState, GameOverState, VictoryState # Importa las clases de estado
+from game_states import MenuState, PlayingState, GameOverState, VictoryState, TransitionState  # Importa las clases de estado
 
 class Game:
     def __init__(self):
@@ -19,6 +19,7 @@ class Game:
 
         # Estado del juego 
         self.current_state = None
+        self.target_level_number = 1 # Nivel a cargar la próxima vez que se entre a PlayingState
         self.change_state(MenuState(self)) # Inicializa el juego con el estado de menú
 
     def load_assets(self):
@@ -52,6 +53,11 @@ class Game:
             self.game_over_image = pygame.image.load("assets/screens/game_over.png").convert_alpha()
             if self.game_over_image.get_width() != SCREEN_WIDTH or self.game_over_image.get_height() != SCREEN_HEIGHT:
                 self.game_over_image = pygame.transform.scale(self.game_over_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
+
+            # --- Cargar imagen para la pantalla de transición ---
+            self.transition_screen_image = pygame.image.load("assets/screens/transition_road.png").convert() # O .convert_alpha()
+            if self.transition_screen_image.get_width() != SCREEN_WIDTH or self.transition_screen_image.get_height() != SCREEN_HEIGHT:
+                self.transition_screen_image = pygame.transform.scale(self.transition_screen_image, (SCREEN_WIDTH, SCREEN_HEIGHT))
 
             for tile_type, path in tile_paths.items():
                 image = pygame.image.load(path).convert_alpha() # .convert_alpha() para transparencia
@@ -164,6 +170,15 @@ class Game:
             self.change_state(GameOverState(self))
         elif new_state_name == "victory":
             self.change_state(VictoryState(self))
+        elif new_state_name == "transition":
+            # TransitionState necesita saber a qué nivel va           
+            if isinstance(self.current_state, PlayingState):
+                # Preparamos el siguiente nivel para cuando volvamos a PlayingState
+                self.target_level_number = self.current_state.current_level_number + 1
+                self.change_state(TransitionState(self, self.target_level_number))
+            else: # No debería ocurrir desde otro estado que no sea Playing
+                self.target_level_number = 1
+                self.change_state(TransitionState(self, self.target_level_number))
         else:
             print(f"Error: Estado '{new_state_name}' desconocido.")
 

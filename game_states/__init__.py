@@ -4,3 +4,4 @@ from .menu_state import MenuState
 from .playing_state import PlayingState
 from .game_over_state import GameOverState
 from .victory_state import VictoryState
+from .transition_state import TransitionState # Nueva importación

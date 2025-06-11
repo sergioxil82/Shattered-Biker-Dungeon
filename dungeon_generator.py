@@ -34,6 +34,13 @@ class Map:
 
     def generate_dungeon(self, playing_state, max_rooms=10, min_room_size=6, max_room_size=12):
         """Genera una mazmorra con habitaciones y pasillos."""
+        # --- LIMPIAR ESTADO DEL MAPA ANTERIOR ---
+        self.tiles = [[TILE_ABYSS for _ in range(self.height)] for _ in range(self.width)]
+        self.player_start_pos = None
+        self.exit_pos = None
+        self.room_rects = [] # Limpiar la lista de rectángulos de habitaciones
+        # self.obstacles se limpia en playing_state.place_obstacles() si es necesario
+
         rooms = []
         num_rooms = 0
 

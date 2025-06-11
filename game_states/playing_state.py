@@ -2,22 +2,22 @@
 import pygame
 import random
 from .base_state import GameState
-from objects import Obstacle # Ajusta la ruta de importación
+from objects import Obstacle 
 from utils.constants import *
 from dungeon_generator import Map
 from player import Player
 from camera import Camera
 from enemy import Enemy
 from pickup import Pickup
-from hub import HUD # Debería ser hud, no hub
+from hub import HUD # Asegúrate que el archivo se llame hud.py
 from motorcycle import Motorcycle
 
 class PlayingState(GameState):
     def __init__(self, game):
         super().__init__(game)
         print("Entrando en el estado: Jugando")
-        self.current_level_number = 1
-        self.max_levels = 3
+        self.current_level_number = self.game.target_level_number # Usar el nivel objetivo del juego
+        self.max_levels = 3  
 
         self.current_map = Map(self.game, MAP_WIDTH, MAP_HEIGHT)
         
@@ -36,19 +36,21 @@ class PlayingState(GameState):
         self.message_timer = 0
         self.message_duration = 2000
 
-        self._initialize_level()
-
         self.hud = HUD(self.game, self.player, self.motorcycle)
         
-        # Estas llamadas deben estar DESPUÉS de _initialize_level si dependen del contenido del nivel
-        # o si _initialize_level las limpia y necesita que se vuelvan a generar.
-        # Si place_obstacles y place_pickups son para todo el nivel y no por habitación,
-        # podrían ir aquí. Si son parte de la generación de la habitación, ya están cubiertas.
-        # Por ahora, las dejamos aquí asumiendo que son para el nivel general después de la generación base.
+       
+        # Crear la cámara ANTES de inicializar el nivel,
+        # ya que _initialize_level() llama a self.camera.update()
+        self.camera = Camera(self.player, self.current_map.width, self.current_map.height)
+
+        # Ahora inicializar el nivel
+        self._initialize_level()
+        
+        # Colocar obstáculos y pickups después de que el nivel y el jugador estén listos
         self.place_obstacles() 
         self.place_pickups() 
         
-        self.camera = Camera(self.player, self.current_map.width, self.current_map.height)
+        # La cámara ya se actualizó en _initialize_level después de posicionar al jugador
         self.camera.update()
              
         self.awaiting_powerful_attack_target = False
@@ -63,6 +65,9 @@ class PlayingState(GameState):
         self.current_map.generate_dungeon(self)
         self.player.x = self.current_map.player_start_pos[0]
         self.player.y = self.current_map.player_start_pos[1]
+
+        # Actualizar la cámara para que se centre en la nueva posición del jugador
+        self.camera.update() 
         
         # Es importante que place_obstacles y place_pickups se llamen DESPUÉS
         # de que el mapa y sus contenidos (enemigos/items de habitaciones) se hayan generado
@@ -188,12 +193,9 @@ class PlayingState(GameState):
                 self.show_message("¡Has completado todas las misiones! ¡VICTORIA!")
                 self.game.request_state_change("victory")
             else:
-                self.current_level_number += 1
-                self.show_message(f"¡Salida encontrada! Preparando Nivel {self.current_level_number}...")
-                self._initialize_level()
-                # Es importante volver a colocar obstáculos y pickups para el nuevo nivel
-                self.place_obstacles() 
-                self.place_pickups()
+                # En lugar de inicializar directamente el nivel, vamos a la pantalla de transición
+                # PlayingState incrementará current_level_number cuando se re-inicialice desde TransitionState
+                self.game.request_state_change("transition")
             return
         
     def update(self, dt):
