@@ -35,7 +35,7 @@ class Game:
             tile_paths = {
                 TILE_ROAD: "assets/tiles/road.png",
                 TILE_WALL: "assets/tiles/wall.png",
-                TILE_ABYSS: "assets/tiles/abyss.png", # Puedes usar una imagen negra
+                #TILE_ABYSS: "assets/tiles/abyss.png", # Puedes usar una imagen negra
                 TILE_ENTRANCE: "assets/tiles/entrance.png",
                 TILE_EXIT: "assets/tiles/exit.png",
                 # Añade aquí otros tiles si los tienes, como TILE_GARAGE_FLOOR

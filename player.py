@@ -120,19 +120,21 @@ class Player:
 
         # Si el código llega aquí, la nueva posición es caminable y no hay obstáculos
         # Guardar el tipo de tile actual del jugador antes de moverse
-        previous_tile_type = current_map.tiles[self.x][self.y]
+        original_player_x, original_player_y = self.x, self.y
 
         # Actualiza la posición del jugador
         self.x = new_x
         self.y = new_y
         # Primero, verificamos si el nuevo tile es caminable
         if current_map.is_walkable(new_x, new_y):
-            # Si el jugador se mueve desde la posición de entrada, cambia el tile a carretera
-            if previous_tile_type  == TILE_ENTRANCE:
-                current_map.tiles[self.x - dx][self.y - dy] = TILE_ENTRANCE
-            # Si el jugador se mueve desde la posición de salida, cambia el tile a salida
-            elif previous_tile_type  == TILE_EXIT:
-                current_map.tiles[self.x - dx][self.y - dy] = TILE_EXIT # La salida sigue siendo salida
+            # Si el jugador se mueve desde la posición de entrada o salida (que ahora son paredes),
+            # restaura el tile original a TILE_WALL.
+            if current_map.tiles[original_player_x][original_player_y] == TILE_ENTRANCE or \
+               current_map.tiles[original_player_x][original_player_y] == TILE_EXIT:
+                # No cambiamos el tile de la entrada/salida a TILE_WALL inmediatamente,
+                # ya que el jugador podría querer volver a entrar/salir si se implementa esa lógica.
+                # Por ahora, simplemente nos movemos. El tile de entrada/salida permanece.
+                pass
 
             self.game.sound_move.play() # Sonido de movimiento del jugador
 

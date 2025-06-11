@@ -93,12 +93,35 @@ class Map:
 
         # Establece el punto de inicio del jugador y la salida en la primera y última habitación
         if rooms:
-            first_room = rooms[0]
-            self.player_start_pos = first_room.center
+            first_room = rooms[0]            
+            # Seleccionar una pared de la primera habitación para el inicio
+            # (x, y) será una coordenada de pared adyacente al interior
+            start_x_options = [first_room.left -1, first_room.right]
+            start_y_options = [first_room.top -1, first_room.bottom]
+            
+            #Elegir aleatoriamente una pared (arriba, abajo, izquierda, derecha)
+            if random.choice([True, False]): # Pared vertical (izquierda o derecha)
+                self.player_start_pos = (random.choice(start_x_options), random.randint(first_room.top, first_room.bottom -1))
+            else: # Pared horizontal (arriba o abajo)
+                self.player_start_pos = (random.randint(first_room.left, first_room.right-1), random.choice(start_y_options))
+
+            # Asegurarse de que la posición de inicio esté dentro de los límites del mapa
+            self.player_start_pos = (max(0, min(self.player_start_pos[0], self.width - 1)),
+                                     max(0, min(self.player_start_pos[1], self.height - 1)))
             self.tiles[self.player_start_pos[0]][self.player_start_pos[1]] = TILE_ENTRANCE
 
             last_room = rooms[-1]
-            self.exit_pos = last_room.center
+            # Seleccionar una pared de la última habitación para la salida
+            exit_x_options = [last_room.left -1, last_room.right]
+            exit_y_options = [last_room.top -1, last_room.bottom]
+
+            if random.choice([True, False]):
+                self.exit_pos = (random.choice(exit_x_options), random.randint(last_room.top, last_room.bottom -1))
+            else:
+                self.exit_pos = (random.randint(last_room.left, last_room.right-1), random.choice(exit_y_options))
+            
+            self.exit_pos = (max(0, min(self.exit_pos[0], self.width - 1)),
+                             max(0, min(self.exit_pos[1], self.height - 1)))
             self.tiles[self.exit_pos[0]][self.exit_pos[1]] = TILE_EXIT
 
         print(f"Mazmorra generada con {num_rooms} habitaciones.")

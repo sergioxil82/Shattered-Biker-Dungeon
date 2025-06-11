@@ -55,5 +55,12 @@ COLOR_WALL = YELLOW
 COLOR_GARAGE_FLOOR = GRAY
 COLOR_ENTRANCE = GREEN
 COLOR_EXIT = RED
-COLOR_ABYSS = WHITE
+COLOR_ABYSS = BLACK
 COLOR_OBJECT = BLUE
+
+# --- Colores para el Medidor de Combustible ---
+COLOR_FUEL_BACKGROUND = (0, 0, 0)      # Negro
+COLOR_FUEL_BORDER = (57, 255, 20)     # Verde fosforito (como los LCD antiguos)
+COLOR_FUEL_FULL = (0, 191, 255)       # Azul (Deep Sky Blue)
+COLOR_FUEL_LOW = (255, 255, 0)        # Amarillo
+COLOR_FUEL_EMPTY = (255, 0, 0)        # Rojo

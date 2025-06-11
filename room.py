@@ -39,23 +39,26 @@ class Room(pygame.Rect):
         
         random.shuffle(possible_spawn_points)
         
-        # --- Generar Enemigos ---
-        num_enemies_to_spawn = random.randint(0, 5)
-        for _ in range(num_enemies_to_spawn):
-            if not possible_spawn_points: break # No más puntos disponibles
-            
-            spawn_x, spawn_y = possible_spawn_points.pop()
-            
-            enemy_type = "basic_grunt"
-            if random.random() < 0.3:
-                enemy_type = "heavy_hitter"
-            
-            initial_state = random.choice(["idle", "alert"])
-            
-            new_enemy = Enemy(self.game, spawn_x, spawn_y, enemy_type, room_rect=self)
-            new_enemy.state = initial_state # Establecer estado inicial
-            playing_state.enemies.append(new_enemy)
-            print(f"Room {self.level} generó {enemy_type} en ({spawn_x},{spawn_y}) en estado {initial_state}")
+        # --- Generar Enemigos (solo si no es la habitación inicial) ---
+        if self.level != 0: # La habitación 0 es la inicial
+            num_enemies_to_spawn = random.randint(0, 5)
+            for _ in range(num_enemies_to_spawn):
+                if not possible_spawn_points: break # No más puntos disponibles
+                
+                spawn_x, spawn_y = possible_spawn_points.pop()
+                
+                enemy_type = "basic_grunt"
+                if random.random() < 0.3:
+                    enemy_type = "heavy_hitter"
+                
+                initial_state = random.choice(["idle", "alert"])
+                
+                new_enemy = Enemy(self.game, spawn_x, spawn_y, enemy_type, room_rect=self)
+                new_enemy.state = initial_state # Establecer estado inicial
+                playing_state.enemies.append(new_enemy)
+                print(f"Room {self.level} generó {enemy_type} en ({spawn_x},{spawn_y}) en estado {initial_state}")
+        else:
+            print(f"Room {self.level} (inicial) no generará enemigos.")
 
         # --- Generar Ítems ---
         num_items_to_spawn = random.randint(0, 3)

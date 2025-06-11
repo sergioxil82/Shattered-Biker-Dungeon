@@ -8,7 +8,8 @@ from camera import Camera
 from enemy import Enemy
 import random
 from pickup import Pickup
-from item import Item, Weapon, Armor, Consumable
+from hub import HUD
+from motorcycle import Motorcycle
 
 # --- Clase Base para los Estados del Juego ---
 class GameState:
@@ -91,6 +92,9 @@ class PlayingState(GameState):
                             self.current_map.player_start_pos[0],
                             self.current_map.player_start_pos[1])
         
+        self.motorcycle = Motorcycle(self.game) # Placeholder para el objeto motocicleta
+        self.hud = HUD(self.game, self.player, self.motorcycle) # <--- Crear instancia de HUD
+        
         self.place_obstacles() # <-- Llama a un método para colocar obstáculos
         self.place_pickups() # <-- Nuevo método para colocar pickups
         
@@ -141,6 +145,15 @@ class PlayingState(GameState):
                 dx = 1
 
             if dx != 0 or dy != 0:
+                # --- COMPROBACIÓN DE COMBUSTIBLE ANTES DE INTENTAR MOVER ---
+                if self.motorcycle and self.motorcycle.fuel_current <= 0:
+                    self.show_message("¡SIN COMBUSTIBLE! Te has quedado tirado.")
+                    self.game.request_state_change("game_over") # Game Over inmediato
+                    # No es necesario 'return' aquí si player_action_taken no se establece,
+                    # ya que el turno del enemigo no se procesaría.
+                    # Sin embargo, para claridad y evitar cualquier movimiento, podemos dejarlo.
+                    return # Finaliza el manejo de esta entrada si no hay combustible.
+                
                 # Posición objetivo del jugador
                 target_x = self.player.x + dx
                 target_y = self.player.y + dy
@@ -197,7 +210,17 @@ class PlayingState(GameState):
                         player_moved = self.player.move(dx, dy, self.current_map)
                         if player_moved:
                             player_action_taken = True
-                            
+
+                            # --- Consumir combustible de la motocicleta si el jugador se mueve ---
+                            if self.motorcycle: # Asegurarse de que hay una motocicleta
+                                self.motorcycle.consume_fuel(0.5)
+                                # --- COMPROBACIÓN DE COMBUSTIBLE DESPUÉS DE MOVER Y CONSUMIR ---
+                                if self.motorcycle.fuel_current <= 0:
+                                    self.show_message("¡TE HAS QUEDADO SIN COMBUSTIBLE!")
+                                    # El cambio a game_over se solicitará. El turno del enemigo aún se procesará
+                                    # antes de que el estado cambie efectivamente en el bucle principal del juego.
+                                    self.game.request_state_change("game_over")
+
                             # --- Comprobar recogida de Pickups (después de que el jugador se mueve) ---
                             for pickup in self.pickups:
                                 if not pickup.is_collected and \
@@ -293,7 +316,7 @@ class PlayingState(GameState):
             screen.blit(item_on_map.image, self.camera.apply(item_on_map_rect_world))
 
         # Dibuja el HUD (barra de vida, etc.) 
-        self.draw_hud(screen)       
+        self.hud.draw(screen)      
 
         # --- Dibujar Mensaje de Estado ---
         if self.message:
@@ -307,64 +330,6 @@ class PlayingState(GameState):
         # --- Dibuja Inventario si está abierto (delegado al inventario del jugador) ---
         self.player.inventory.draw(screen) # El inventario solo se dibuja si is_open es True
         
-
-    def draw_hud(self, screen):
-        """Dibuja la interfaz de usuario (HUD) en la pantalla."""
-        # Barra de vida
-        hp_bar_width = 150
-        hp_bar_height = 20
-        hp_bar_x = 10
-        hp_bar_y = 10
-        
-        # Color de la barra de vida (verde si está bien, amarillo si medio, rojo si bajo)
-        hp_percentage = self.player.current_hp / self.player.max_hp
-        if hp_percentage > 0.6:
-            hp_color = GREEN
-        elif hp_percentage > 0.25:
-            hp_color = YELLOW
-        else:
-            hp_color = RED
-
-        pygame.draw.rect(screen, hp_color, (hp_bar_x, hp_bar_y, hp_bar_width * hp_percentage, hp_bar_height))
-        pygame.draw.rect(screen, WHITE, (hp_bar_x, hp_bar_y, hp_bar_width, hp_bar_height), 2) # Borde blanco
-
-        # Texto de HP
-        hp_text = self.game.font.render(f"HP: {self.player.current_hp}/{self.player.max_hp}", True, WHITE)
-        screen.blit(hp_text, (hp_bar_x + hp_bar_width + 10, hp_bar_y))
-
-        # Ataque y Defensa
-        attack_text = self.game.font.render(f"Ataque: {self.player.attack}", True, WHITE)
-        defense_text = self.game.font.render(f"Defensa: {self.player.defense}", True, WHITE)
-        screen.blit(attack_text, (10, hp_bar_y + hp_bar_height + 10))
-        screen.blit(defense_text, (10, hp_bar_y + hp_bar_height + 40))
-
-        # Cooldown de Habilidad
-        skill_cooldown_text = self.game.font.render(
-            f"Ataque Potente CD: {self.player.cooldown_powerful_attack}",
-            True, WHITE if self.player.cooldown_powerful_attack == 0 else YELLOW
-        )
-        screen.blit(skill_cooldown_text, (10, SCREEN_HEIGHT - 60))
-
-        # Instrucciones de habilidad (opcional, si tienes un font_small, si no, usa el font normal)
-        # Asegúrate de tener el font_small cargado en main.py si lo usas.
-        try:
-            skill_inst_text = self.game.font_small.render("S: Ataque Potente", True, WHITE)
-        except AttributeError: # Si self.game.font_small no existe, usa el font normal
-            skill_inst_text = self.game.font.render("S: Ataque Potente", True, WHITE)
-            
-        screen.blit(skill_inst_text, (10, SCREEN_HEIGHT - 30))
-
-        # Efectos de Estado
-        y_offset_effects = SCREEN_HEIGHT - 90
-        for effect_name, effect_data in self.player.status_effects.items():
-            effect_text = self.game.font.render( # Usamos el font normal aquí, puedes ajustar
-                f"{effect_name.title()} ({effect_data['duration']}t)",
-                True, YELLOW if effect_name == "poisoned" else WHITE # Color diferente para veneno
-            )
-            # Dibuja los efectos desde la esquina inferior derecha, apilando hacia arriba
-            screen.blit(effect_text, (SCREEN_WIDTH - effect_text.get_width() - 10, y_offset_effects))
-            y_offset_effects -= 25 # Mueve el siguiente texto 25 píxeles hacia arriba
-
     def show_message(self, text):
         """Muestra un mensaje temporal en pantalla."""
         self.message = text
