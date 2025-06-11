@@ -144,9 +144,7 @@ class Player:
 
             # Si el jugador llega a la salida, haz algo (por ejemplo, print)
             if current_map.tiles[self.x][self.y] == TILE_EXIT:
-                print("¡Has llegado a la salida!")
-                self.game.current_state.show_message("¡Has llegado a la salida!")
-                self.game.request_state_change("victory")            
+                print("¡Has llegado a la salida!")                         
             
             return True
 

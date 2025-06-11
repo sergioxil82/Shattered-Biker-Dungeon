@@ -1,7 +1,7 @@
 import pygame
 import sys
 from utils.constants import *
-from game_state import MenuState, PlayingState, GameOverState, VictoryState # Importa las clases de estado
+from game_states import MenuState, PlayingState, GameOverState, VictoryState # Importa las clases de estado
 
 class Game:
     def __init__(self):
