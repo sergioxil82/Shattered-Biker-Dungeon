@@ -3,7 +3,6 @@ import random
 import pygame
 from room import Room
 from utils.constants import *
-from objects import Obstacle 
 
 class Map:
     def __init__(self, game, width, height):
@@ -12,6 +11,12 @@ class Map:
         self.height = height
         # Inicializa todo el mapa como ABISMO (negro)
         self.tiles = [[TILE_ABYSS for _ in range(self.height)] for _ in range(self.width)]
+
+        # --- FOV y Niebla de Guerra ---
+        # 0: HIDDEN, 1: EXPLORED, 2: VISIBLE
+        self.visibility_map = [[0 for _ in range(self.height)] for _ in range(self.width)]
+        self.fov_radius = 8 # Radio de visión del jugador en tiles
+
         self.player_start_pos = None
         self.exit_pos = None # Asegúrate de que exit_pos esté inicializado
         self.obstacles = []
@@ -38,6 +43,7 @@ class Map:
         self.tiles = [[TILE_ABYSS for _ in range(self.height)] for _ in range(self.width)]
         self.player_start_pos = None
         self.exit_pos = None
+        self.visibility_map = [[0 for _ in range(self.height)] for _ in range(self.width)] # Reiniciar FOV
         self.room_rects = [] # Limpiar la lista de rectángulos de habitaciones
         # self.obstacles se limpia en playing_state.place_obstacles() si es necesario
 
@@ -176,62 +182,109 @@ class Map:
         for x in range(start_tile_x, end_tile_x):
             for y in range(start_tile_y, end_tile_y):
                 tile_type = self.tiles[x][y]
-
-                # Obtén la imagen del tile del diccionario del juego
-                # self.game.tile_images es la forma de accederlo desde el mapa
-                # Nota: Necesitamos pasar `game` al constructor del mapa para que pueda acceder a `tile_images`.
-                # Vamos a cambiar eso primero en `PlayingState` y `Map` constructor.
-                # Asumamos por ahora que `self.game` está accesible aquí.
-                # Pero la forma correcta es que `game_state` le pase el diccionario al `map.draw`.
-
-                # --- Corrección importante aquí: Map.draw no tiene acceso directo a self.game ---
-                # El método `draw` de Map recibe `screen` y `camera`.
-                # Para acceder a las imágenes, necesitas que `PlayingState` las pase al `Map.draw`
-                # O que `Map` reciba una referencia al objeto `Game` en su `__init__`.
-                # La segunda opción es más limpia para esto.
-
-                # Opción 1 (más limpia): Pasa `game` al constructor del mapa
-                # Si en PlayingState tienes:
-                # self.current_map = Map(MAP_WIDTH, MAP_HEIGHT)
-                # DEBERÍA SER:
-                # self.current_map = Map(self.game, MAP_WIDTH, MAP_HEIGHT) # <--- CAMBIO IMPORTANTE
-                # Y el __init__ de Map:
-                # def __init__(self, game, width, height):
-                #     self.game = game # <--- AÑADE ESTO
-                #     self.width = width
-                #     self.height = height
-                #     # ... resto del __init__
-
-                # Asumiendo que `self.game` ahora está accesible en `Map`:
-                tile_image = self.game.tile_images.get(tile_type)
-
                 tile_rect_world  = pygame.Rect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
                 tile_rect_screen = camera.apply(tile_rect_world)
+                visibility = self.visibility_map[x][y] if self.game.config.get("fov_enabled", True) else 2
 
-                if tile_image: # Solo dibuja si hay una imagen cargada para este tipo de tile
-                    screen.blit(tile_image, tile_rect_screen)
-                else: # Si no hay imagen, dibuja un placeholder de color (útil para depuración)
-                    color = BLACK # O un color por defecto
-                    if tile_type == TILE_ROAD: color = COLOR_ROAD
-                    elif tile_type == TILE_WALL: color = COLOR_WALL
-                    elif tile_type == TILE_GARAGE_FLOOR: color = COLOR_GARAGE_FLOOR
-                    elif tile_type == TILE_ENTRANCE: color = COLOR_ENTRANCE
-                    elif tile_type == TILE_EXIT: color = COLOR_EXIT
-                    elif tile_type == TILE_ABYSS: color = COLOR_ABYSS
-                    elif tile_type == TILE_OBJECT: color = COLOR_OBJECT
-                    pygame.draw.rect(screen, color, tile_rect_screen)
+                if visibility == 0: # HIDDEN
+                    pygame.draw.rect(screen, BLACK, tile_rect_screen) # O no dibujar nada
+                else:
+                    tile_image = self.game.tile_images.get(tile_type)
+                    if tile_image:
+                        img_to_draw = tile_image.copy()
+                        if visibility == 1: # EXPLORED (pero no visible)
+                            # Aplicar un tinte oscuro
+                            dark_surface = pygame.Surface((TILE_SIZE, TILE_SIZE)).convert_alpha()
+                            dark_surface.fill((0, 0, 0, 150)) # Negro con transparencia
+                            img_to_draw.blit(dark_surface, (0,0))
+                        screen.blit(img_to_draw, tile_rect_screen)
+                    else: # Placeholder de color si no hay imagen
+                        color = BLACK 
+                        if tile_type == TILE_ROAD: color = COLOR_ROAD
+                        elif tile_type == TILE_WALL: color = COLOR_WALL
+                        elif tile_type == TILE_GARAGE_FLOOR: color = COLOR_GARAGE_FLOOR
+                        elif tile_type == TILE_ENTRANCE: color = COLOR_ENTRANCE
+                        elif tile_type == TILE_EXIT: color = COLOR_EXIT
+                        elif tile_type == TILE_ABYSS: color = COLOR_ABYSS
+                        elif tile_type == TILE_OBJECT: color = COLOR_OBJECT
+                        
+                        if visibility == 1: # Tinte para explorado
+                            r, g, b = color
+                            color = (max(0, r-100), max(0, g-100), max(0, b-100))
+                        pygame.draw.rect(screen, color, tile_rect_screen)
+                
 
-        # --- DIBUJAR LOS OBSTÁCULOS DESPUÉS DE LOS TILES ---
-        # Asegúrate de que obstacle_image se haya cargado en main.py y sea accesible aquí.
-        # Asumiendo que `self.game` está accesible y `self.game.obstacle_image` existe:
+        # --- DIBUJAR LOS OBSTÁCULOS DESPUÉS DE LOS TILES ---        
         for obstacle in self.obstacles:
-            obstacle_rect_world = obstacle.get_rect()
-            screen_rect = pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT)
-            if camera.apply(obstacle_rect_world).colliderect(screen_rect):
-                # Dibuja el sprite del obstáculo en lugar del color
-                obstacle_rect_screen = camera.apply(obstacle_rect_world)
-                if hasattr(self.game, 'obstacle_image') and self.game.obstacle_image:
-                    screen.blit(self.game.obstacle_image, obstacle_rect_screen)                 
-                else: # Si no hay imagen de obstáculo, dibuja el color
-                    pygame.draw.rect(screen, obstacle.color, obstacle_rect_screen)
+            # Solo dibujar si el tile del obstáculo es visible o explorado
+            visibility = self.visibility_map[obstacle.x][obstacle.y] if self.game.config.get("fov_enabled", True) else 2
+            if visibility > 0: # VISIBLE o EXPLORED
+                obstacle_rect_world = obstacle.get_rect()
+                screen_rect = pygame.Rect(0, 0, SCREEN_WIDTH, SCREEN_HEIGHT) # Para culling
+                if camera.apply(obstacle_rect_world).colliderect(screen_rect):
+                    img_to_draw = obstacle.image.copy()
+                    if visibility == 1: # EXPLORED
+                        dark_surface = pygame.Surface((TILE_SIZE, TILE_SIZE)).convert_alpha()
+                        dark_surface.fill((0, 0, 0, 150))
+                        img_to_draw.blit(dark_surface, (0,0)) 
+                    screen.blit(img_to_draw, camera.apply(obstacle_rect_world))
                     
+    def is_transparent(self, x, y):
+        """Determina si un tile bloquea la visión."""
+        if 0 <= x < self.width and 0 <= y < self.height:
+            # Los tiles de suelo, carretera, entrada, salida son transparentes.
+            # Las paredes y obstáculos bloquean la visión.
+            tile = self.tiles[x][y]
+            return tile not in [TILE_WALL, TILE_OBJECT, TILE_ABYSS] # Abismo también bloquea
+        return False # Fuera del mapa bloquea la visión
+
+    def update_fov(self, player_x, player_y):
+        """Calcula el campo de visión del jugador."""
+        if not self.game.config.get("fov_enabled", True): # Si FOV está desactivado, todo visible
+            for x in range(self.width):
+                for y in range(self.height):
+                    self.visibility_map[x][y] = 2 # VISIBLE
+            return
+
+        # Primero, todos los tiles que eran VISIBLE ahora son EXPLORED
+        for x_v in range(self.width):
+            for y_v in range(self.height):
+                if self.visibility_map[x_v][y_v] == 2: # Si era VISIBLE
+                    self.visibility_map[x_v][y_v] = 1 # Ahora es EXPLORED
+
+        # El tile del jugador siempre es visible
+        self.visibility_map[player_x][player_y] = 2 # VISIBLE
+
+        # Algoritmo de Shadow Casting (simplificado para 8 octantes)
+        for octant in range(8):
+            self._cast_light(player_x, player_y, 1, 1.0, 0.0, octant)
+
+    def _cast_light(self, cx, cy, row, start_slope, end_slope, octant):
+        if start_slope < end_slope:
+            return
+
+        for i in range(row, self.fov_radius + 1):
+            blocked = False
+            dx, dy = -i, -i # Para iterar sobre las celdas de la fila actual del octante
+            for j in range(i + 1): # Iterar sobre las celdas de la fila
+                # Transformar coordenadas según el octante
+                # Esta es la parte compleja del Shadow Casting, mapear (i, j) a (map_x, map_y)
+                # según el octante.
+                # Por simplicidad, aquí usaremos una aproximación de "círculo"
+                # y luego refinaremos si es necesario.
+                # Esta es una implementación MUY simplificada y no es Shadow Casting real.
+                # Para un Shadow Casting correcto, se necesitan transformaciones por octante.
+                # --- INICIO APROXIMACIÓN SIMPLE (CÍRCULO) ---
+                for angle in range(0, 360, 5): # Comprobar rayos en varias direcciones
+                    rad = angle * (3.14159 / 180.0)
+                    for r in range(1, self.fov_radius + 1):
+                        map_x = cx + int(r * pygame.math.Vector2(1, 0).rotate_rad(rad).x)
+                        map_y = cy + int(r * pygame.math.Vector2(1, 0).rotate_rad(rad).y)
+
+                        if 0 <= map_x < self.width and 0 <= map_y < self.height:
+                            self.visibility_map[map_x][map_y] = 2 # VISIBLE
+                            if not self.is_transparent(map_x, map_y): # Si el tile bloquea la luz
+                                break # Detener este rayo
+                return # Salir después de la aproximación simple
+                # --- FIN APROXIMACIÓN SIMPLE ---
+                # El código de Shadow Casting real iría aquí, manejando pendientes y octantes.

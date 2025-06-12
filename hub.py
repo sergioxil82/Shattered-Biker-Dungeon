@@ -75,6 +75,25 @@ class HUD:
 
         # --- Medidor de Combustible de la Motocicleta ---
         if self.motorcycle: # Solo dibujar si hay una motocicleta
+            # --- Barra de HP de la Motocicleta ---
+            moto_hp_bar_width = 100
+            moto_hp_bar_height = 15
+            moto_hp_bar_x = self.fuel_gauge_x - moto_hp_bar_width - 10 # A la izquierda del medidor de fuel
+            moto_hp_bar_y = self.fuel_gauge_y
+
+            moto_hp_percentage = 0
+            if self.motorcycle.max_hp > 0:
+                moto_hp_percentage = self.motorcycle.current_hp / self.motorcycle.max_hp
+
+            if moto_hp_percentage > 0.6: moto_color = BLUE
+            elif moto_hp_percentage > 0.25: moto_color = ORANGE
+            else: moto_color = DARK_RED
+
+            pygame.draw.rect(screen, moto_color, (moto_hp_bar_x, moto_hp_bar_y, moto_hp_bar_width * moto_hp_percentage, moto_hp_bar_height))
+            pygame.draw.rect(screen, WHITE, (moto_hp_bar_x, moto_hp_bar_y, moto_hp_bar_width, moto_hp_bar_height), 1)
+            moto_hp_text = self.game.font_small.render(f"Moto: {int(self.motorcycle.current_hp)}/{int(self.motorcycle.max_hp)}", True, WHITE)
+            screen.blit(moto_hp_text, (moto_hp_bar_x, moto_hp_bar_y + moto_hp_bar_height + 2))
+            
             # Fondo y borde del medidor
             gauge_rect = pygame.Rect(self.fuel_gauge_x, self.fuel_gauge_y, self.fuel_gauge_width, self.fuel_gauge_height)
             pygame.draw.rect(screen, COLOR_FUEL_BACKGROUND, gauge_rect)

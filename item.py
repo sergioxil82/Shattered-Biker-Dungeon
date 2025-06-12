@@ -61,4 +61,10 @@ class Consumable(Item):
             print(f"Moto reabastecida. Combustible: {motorcycle.fuel_current}/{motorcycle.fuel_max}")
             # Podrías añadir un sonido específico para reabastecer
 
+        elif self.effect.get("repair_moto") and motorcycle: # Comprobar que motorcycle no sea None
+            repair_amount = self.effect["repair_moto"]
+            motorcycle.repair(repair_amount)
+            self.game.current_state.show_message(f"¡Moto reparada +{repair_amount} comb.!")
+            print(f"Moto reaprada. Estado: {motorcycle.current_hp}/{motorcycle.max_hp}")
+
         return True # El uso de un consumible generalmente consume el turno

@@ -44,6 +44,7 @@ class Player:
         if self.current_hp <= 0:
             print("¡Has sido derrotado!")
             self.game.sound_player_death.play() # Sonido de muerte del jugador
+            self.game.request_state_change("game_over")
             return True # Jugador derrotado
         return False # Jugador no derrotado
     # --- Métodos de Combate (modificados para incluir habilidades) ---
@@ -75,6 +76,10 @@ class Player:
         if self.cooldown_powerful_attack > 0:
             self.cooldown_powerful_attack -= 1
             if self.cooldown_powerful_attack == 0:
+                # Restaurar defensa si estaba corroído y el efecto termina
+                if "corroded" in self.status_effects and self.status_effects["corroded"]["duration"] <= 0:
+                    self.defense = self.base_defense + (self.inventory.equipped_armor.defense_bonus if self.inventory.equipped_armor else 0)
+                    # No mostramos mensaje aquí, se hace al eliminar el efecto                
                 self.game.current_state.show_message("¡Ataque Potente listo!")
 
         # Aquí se manejarían otros efectos de estado del jugador (ej. envenenado, boost de ataque temporal)
@@ -90,11 +95,19 @@ class Player:
                     self.game.current_state.show_message("¡Has sucumbido al veneno! GAME OVER")
                     self.game.request_state_change("game_over")
                     return # El jugador murió, no seguir procesando
+                
+            elif effect_name == "corroded":
+                if effect_data["duration"] == self.status_effects[effect_name]["initial_duration"]: # Aplicar solo una vez al inicio
+                    self.defense = max(0, self.defense - effect_data["potency"])
+                    print(f"Defensa del jugador reducida por corrosión a {self.defense}")
 
             effect_data["duration"] -= 1
             if effect_data["duration"] <= 0:
                 effects_to_remove.append(effect_name)
                 self.game.current_state.show_message(f"El efecto '{effect_name}' ha terminado.")
+                if effect_name == "corroded": # Restaurar defensa
+                    self.defense = self.base_defense + (self.inventory.equipped_armor.defense_bonus if self.inventory.equipped_armor else 0)
+                    print(f"Corrosión terminada. Defensa restaurada a {self.defense}")
 
         for effect_name in effects_to_remove:
             del self.status_effects[effect_name]
@@ -160,5 +173,10 @@ class Player:
     
     # --- Nuevo método para aplicar efectos de estado ---
     def apply_effect(self, effect_name, duration, potency=0):
-        self.status_effects[effect_name] = {"duration": duration, "potency": potency}
+        # Guardar la duración inicial para efectos que se aplican una vez (como reducción de defensa)
+        self.status_effects[effect_name] = {"duration": duration, "potency": potency, "initial_duration": duration}
         print(f"Efecto de estado '{effect_name}' aplicado al jugador. Duración: {duration}, Potencia: {potency}")
+
+        # Aplicar efecto inmediato si es necesario (ej. corrosión que reduce defensa al instante)
+        if effect_name == "corroded":
+            pass # La reducción de defensa se maneja en end_turn_update para que ocurra una vez

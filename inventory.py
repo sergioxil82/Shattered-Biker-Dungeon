@@ -167,7 +167,7 @@ class Inventory:
                 elif item.item_type == "consumable":
                     if item.effect.get("heal"): stat_text = f"Cura: {item.effect['heal']} HP"
                     elif item.effect.get("refuel"): stat_text = f"Rellena: {item.effect['refuel']} Comb."
-                
+                    elif item.effect.get("repair_moto"): stat_text = f"Repara: {item.effect['repair_moto']} Moto HP"                
                 
                 if stat_text:
                     stat_surf = self.font_desc.render(stat_text, True, BLUE)

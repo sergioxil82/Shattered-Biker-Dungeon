@@ -47,9 +47,14 @@ class Room(pygame.Rect):
                 
                 spawn_x, spawn_y = possible_spawn_points.pop()
                 
-                enemy_type = "basic_grunt"
-                if random.random() < 0.3:
-                    enemy_type = "heavy_hitter"
+                 # Decidir tipo de enemigo
+                rand_val = random.random()
+                if rand_val < 0.5: # 50%
+                    enemy_type = "basic_grunt"
+                elif rand_val < 0.8: # 30%
+                    enemy_type = "heavy_hitter" 
+                else: # 20%
+                    enemy_type = "acid_spitter"
                 
                 initial_state = random.choice(["idle", "alert"])
                 
@@ -67,7 +72,8 @@ class Room(pygame.Rect):
             Armor(self.game, "Chaleco Cuero", "Protección básica de motero.", 3, "assets/items/leather_vest.png"),
             Consumable(self.game, "Café Turbo", "Te da un subidón de energía.", {"heal": 10}, "assets/items/coffee.png"),
             Weapon(self.game, "Bate con Clavos", "¡Duele mucho!", 10, "assets/items/spiked_bat.png"),
-            Consumable(self.game, "Bidón Gasolina", "Rellena combustible de la moto.", {"refuel": 50}, "assets/items/gas_can.png")
+            Consumable(self.game, "Bidón Gasolina", "Rellena combustible de la moto.", {"refuel": 50}, "assets/items/gas_can.png"),
+            Consumable(self.game, "Kit Reparación", "Repara la motocicleta.", {"repair_moto": 40}, "assets/items/repair_kit.png") # NUEVO
         ]
         for _ in range(num_items_to_spawn):
             if not possible_spawn_points or not available_items: break

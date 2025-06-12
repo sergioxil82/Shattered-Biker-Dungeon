@@ -29,6 +29,8 @@ class Enemy:
         self.last_known_player_pos = None
         self.home_room_rect = room_rect # Habitación de origen para patrullar
         self.name = self.enemy_type.replace('_', ' ').title() # Para mensajes
+        self.special_attack_cooldown = 0 # Cooldown para ataques especiales
+
 
         self.load_stats_and_image_by_type()
 
@@ -57,12 +59,14 @@ class Enemy:
 
         player_defeated = target_player.take_damage(actual_damage)
 
-        # --- Lógica de efecto de estado: Veneno --- 
-        if self.enemy_type == "poisonous_crawler" and random.random() < 0.4: # 40% de probabilidad de envenenar
-            target_player.apply_effect("poisoned", duration=3, potency=5) # Envenena por 3 turnos, 5 de daño por turno
-            self.game.current_state.show_message("¡Has sido ENVENENADO!")
+       # --- Lógica de efecto de estado ---
+        if self.enemy_type == "acid_spitter": # Ejemplo si el ataque normal también puede corroer
+            if random.random() < 0.2: # 20% de probabilidad de corroer en ataque normal
+                target_player.apply_effect("corroded", duration=3, potency=2) # Reduce defensa en 2 por 3 turnos
+                self.game.current_state.show_message("¡Tu equipo se CORROE!")
 
         return player_defeated
+    
     def _get_distance_to_player(self, player):
         return abs(self.x - player.x) + abs(self.y - player.y) # Distancia Manhattan
 
@@ -163,10 +167,28 @@ class Enemy:
             print(f"{self.name} cambió a estado: alert (jugador se alejó o cambió de habitación)")
             return
 
-        if dist_to_player <= 1: # Adyacente
-            self.attack_target(player)
-        else: # Perseguir
-            self._move_towards_target((player.x, player.y), current_map, all_enemies, (player.x, player.y))
+        # Lógica específica para Acid Spitter
+        if self.enemy_type == "acid_spitter" and self.special_attack_cooldown == 0 and 2 <= dist_to_player <= 4:
+            # Intenta ataque especial si está en rango y cooldown listo
+            self._acid_spit_attack(player, current_map)
+            self.special_attack_cooldown = 3 # Cooldown de 3 turnos para el escupitajo
+        elif dist_to_player <= 1: # Adyacente
+            self.attack_target(player) # Ataque normal
+        else: # Perseguir o mantener distancia
+            if self.enemy_type == "acid_spitter" and dist_to_player < 2:
+                # Intenta retroceder si está demasiado cerca
+                self._move_away_from_target((player.x, player.y), current_map, all_enemies, (player.x, player.y))
+            else:
+                self._move_towards_target((player.x, player.y), current_map, all_enemies, (player.x, player.y))
+
+    def _acid_spit_attack(self, player, current_map):
+        self.game.current_state.show_message(f"¡{self.name} escupe ácido!")
+        # Por ahora, daño directo. Podríamos añadir un proyectil visual más adelante.
+        player.take_damage(self.attack * 0.75) # El ácido hace un poco menos que el ataque base
+        if random.random() < 0.5: # 50% de probabilidad de aplicar corrosión
+            player.apply_effect("corroded", duration=3, potency=2) # Reduce defensa en 2 por 3 turnos
+            self.game.current_state.show_message("¡Tu equipo se CORROE!")
+
 
     def _move_randomly(self, current_map, all_enemies, player_pos_for_collision_check):
         """Movimiento aleatorio simple, similar al 'move' original."""
@@ -179,7 +201,10 @@ class Enemy:
     def update_ai(self, player, current_map, all_enemies):
         if not self.is_alive:
             return
-
+        
+        if self.special_attack_cooldown > 0:
+            self.special_attack_cooldown -=1
+            
         if self.state == "idle":
             self._behavior_idle(player, current_map)
         elif self.state == "surprised":
@@ -232,16 +257,18 @@ class Enemy:
             # o tener una imagen más genérica y escalarla/tintarla
             self.image = self.game.heavy_hitter_image # <-- Necesitarías cargar esta en main.py
            
-            if not hasattr(self.game, 'heavy_hitter_image'):               
+            if not hasattr(self.game, 'heavy_hitter_image') or not self.game.heavy_hitter_image:               
                 self.image = self.game.enemy_image # Fallback si no está cargada
-      
-        # Añade más tipos de enemigos aquí
-        # elif self.enemy_type == "fast_scout":
-        #     self.max_hp = 20
-        #     self.current_hp = 20
-        #     self.attack = 5
-        #     self.defense = 2
-        #     self.image = self.game.fast_scout_image
+
+        elif self.enemy_type == "acid_spitter":
+            self.max_hp = 25
+            self.current_hp = 25
+            self.attack = 10 # Su ataque principal es el escupitajo
+            self.defense = 1
+            self.image = self.game.acid_spitter_image # Necesitas cargar esta imagen
+            if not hasattr(self.game, 'acid_spitter_image') or not self.game.acid_spitter_image:
+                self.image = self.game.enemy_image # Fallback
+        
 
         # Definir qué ítems suelta este tipo de enemigo
         self.possible_drops = []
@@ -250,6 +277,8 @@ class Enemy:
         elif self.enemy_type == "heavy_hitter":
             self.possible_drops.append(Weapon(self.game, "Bate con Clavos", "¡Duele mucho!", 10, "assets/items/spiked_bat.png"))
             self.possible_drops.append(Armor(self.game, "Chaleco de Placas", "Armadura pesada.", 7, "assets/items/plate_vest.png"))
+        elif self.enemy_type == "acid_spitter":
+            self.possible_drops.append(Consumable(self.game, "Antídoto Débil", "Alivia efectos corrosivos.", {"heal": 5}, "assets/items/antidote.png")) # Placeholder de efecto
 
     def die(self):
         self.is_alive = False
@@ -265,5 +294,40 @@ class Enemy:
             self.game.current_state.items_on_map.append(dropped_item)
             self.game.current_state.show_message(f"¡El enemigo soltó un {dropped_item.name}!")
             print(f"Enemigo soltó {dropped_item.name} en ({self.x}, {self.y}).")
+    
+    def _move_away_from_target(self, target_pos, current_map, all_enemies, player_pos_for_collision_check):
+        """Intenta moverse un paso alejándose de target_pos."""
+        dx_total = self.x - target_pos[0] # Invertido para alejarse
+        dy_total = self.y - target_pos[1] # Invertido para alejarse
+
+        possible_steps = []
+        if dx_total != 0:
+            possible_steps.append((1 if dx_total > 0 else -1, 0))
+        if dy_total != 0:
+            possible_steps.append((0, 1 if dy_total > 0 else -1))
+        
+        random.shuffle(possible_steps)
+
+        for dx, dy in possible_steps:
+            new_x = self.x + dx
+            new_y = self.y + dy
+            # Reutilizar la lógica de _move_towards_target para la validación del movimiento
+            # pero con el objetivo de la nueva casilla (new_x, new_y)
+            # Esto es un poco indirecto, idealmente _move_towards_target se refactorizaría
+            # para solo validar y mover, y la decisión de la dirección vendría de fuera.
+            # Por ahora, intentamos movernos a la casilla calculada.
+            if self._is_move_valid(new_x, new_y, current_map, all_enemies, player_pos_for_collision_check):
+                self.x = new_x
+                self.y = new_y
+                return True
+        return False
+
+    def _is_move_valid(self, new_x, new_y, current_map, all_enemies, player_pos_for_collision_check):
+        # Lógica de validación extraída de _move_towards_target
+        if not current_map.is_walkable(new_x, new_y): return False
+        if any(obs.x == new_x and obs.y == new_y for obs in current_map.obstacles): return False
+        if new_x == player_pos_for_collision_check[0] and new_y == player_pos_for_collision_check[1]: return False # No chocar con jugador al huir
+        if any(other.is_alive and other is not self and other.x == new_x and other.y == new_y for other in all_enemies): return False
+        return True
 
 

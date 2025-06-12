@@ -1,5 +1,6 @@
 import pygame
 import sys
+import json
 from utils.constants import *
 from game_states import MenuState, PlayingState, GameOverState, VictoryState, TransitionState  # Importa las clases de estado
 
@@ -10,6 +11,7 @@ class Game:
         pygame.display.set_caption(SCREEN_TITLE)
         self.clock = pygame.time.Clock()
         self.running = True
+        self.config = self.load_config()
 
         # Diccionario para almacenar las imágenes de los tiles por su tipo
         self.tile_images = {}
@@ -21,7 +23,17 @@ class Game:
         self.current_state = None
         self.target_level_number = 1 # Nivel a cargar la próxima vez que se entre a PlayingState
         self.change_state(MenuState(self)) # Inicializa el juego con el estado de menú
+    
 
+    def load_config(self):
+        """Carga la configuración desde config.json."""
+        try:
+            with open("config.json", 'r') as f:
+                return json.load(f)
+        except FileNotFoundError:
+            print("Advertencia: config.json no encontrado. Usando valores por defecto.")
+            return {"fov_enabled": True} # Valores por defecto si el archivo no existe
+        
     def load_assets(self):
         """Carga todas las imágenes, sonidos, etc. del juego."""
         try:
@@ -83,6 +95,10 @@ class Game:
             if self.heavy_hitter_image.get_width() != TILE_SIZE:
                 self.heavy_hitter_image = pygame.transform.scale(self.heavy_hitter_image, (TILE_SIZE, TILE_SIZE))
 
+            # Carga la imagen para el Acid Spitter
+            self.acid_spitter_image = pygame.image.load("assets/sprites/enemy_biker.png").convert_alpha() # Necesitas esta imagen
+            if self.acid_spitter_image.get_width() != TILE_SIZE:
+                self.acid_spitter_image = pygame.transform.scale(self.acid_spitter_image, (TILE_SIZE, TILE_SIZE))
 
             # --- Carga de imágenes de pickups ---
             self.pickup_health_image = pygame.image.load("assets/sprites/health_potion.png").convert_alpha()

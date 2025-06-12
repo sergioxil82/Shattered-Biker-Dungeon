@@ -66,6 +66,8 @@ class PlayingState(GameState):
         self.player.x = self.current_map.player_start_pos[0]
         self.player.y = self.current_map.player_start_pos[1]
 
+        # Calcular FOV inicial
+        self.current_map.update_fov(self.player.x, self.player.y)
         # Actualizar la cámara para que se centre en la nueva posición del jugador
         self.camera.update() 
         
@@ -172,6 +174,9 @@ class PlayingState(GameState):
                             for item_to_remove in items_to_remove:
                                 self.items_on_map.remove(item_to_remove)
 
+                            # Actualizar FOV después de moverse
+                            self.current_map.update_fov(self.player.x, self.player.y)
+
                 if player_action_taken:
                     self.process_enemy_turn()
                     self.player.end_turn_update() 
@@ -211,17 +216,29 @@ class PlayingState(GameState):
 
         for enemy in self.enemies:
             if enemy.is_alive:
-                enemy.draw(screen, self.camera)
+                # Solo dibujar si el enemigo está en un tile visible
+                if self.game.config.get("fov_enabled", True):
+                    if self.current_map.visibility_map[enemy.x][enemy.y] == 2: # VISIBLE
+                        enemy.draw(screen, self.camera)
+                else: # FOV desactivado, dibujar siempre
+                    enemy.draw(screen, self.camera)
 
-        for obstacle in self.current_map.obstacles:
-            obstacle.draw(screen, self.camera)
-
+        
         for pickup in self.pickups:
-            pickup.draw(screen, self.camera)
+            if self.game.config.get("fov_enabled", True):
+                if self.current_map.visibility_map[pickup.x][pickup.y] == 2: # VISIBLE
+                    pickup.draw(screen, self.camera)
+            else:
+                pickup.draw(screen, self.camera)
 
         for item_on_map in self.items_on_map:
-            item_on_map_rect_world = pygame.Rect(item_on_map.x * TILE_SIZE, item_on_map.y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
-            screen.blit(item_on_map.image, self.camera.apply(item_on_map_rect_world))
+            if self.game.config.get("fov_enabled", True):
+                if self.current_map.visibility_map[item_on_map.x][item_on_map.y] == 2: # VISIBLE
+                    item_on_map_rect_world = pygame.Rect(item_on_map.x * TILE_SIZE, item_on_map.y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+                    screen.blit(item_on_map.image, self.camera.apply(item_on_map_rect_world))
+            else:
+                item_on_map_rect_world = pygame.Rect(item_on_map.x * TILE_SIZE, item_on_map.y * TILE_SIZE, TILE_SIZE, TILE_SIZE)
+                screen.blit(item_on_map.image, self.camera.apply(item_on_map_rect_world))
 
         self.hud.draw(screen)      
 
